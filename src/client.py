@@ -2,10 +2,10 @@ import argparse
 import time
 import os
 import requests
-log_dir = os.path.join(os.path.abspath(__file__).strip('client.py'),'logs')
-log_file = None
 
-def main():
+log_file=None
+
+def start_client():
     global log_file
     # get topology
     url = f'http://{args.simulator}/topology'
@@ -38,6 +38,10 @@ if __name__ == '__main__':
     parser.add_argument('--simulator', type=str, help='ip:port of the simulator')
     parser.add_argument('--id', type=int, help='id of this client')
     args = parser.parse_args()
+
+    log_dir = os.path.join(os.path.abspath(__file__).strip('client.py'),'logs')
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
     log_file = os.path.join(log_dir, f'client_{args.id}.log')
     with open(log_file, 'w') as f:
         f.write(f'Client {args.id} started\n')
@@ -45,4 +49,4 @@ if __name__ == '__main__':
 
     # wait for the simulator to start
     time.sleep(3)
-    main()
+    start_client()
