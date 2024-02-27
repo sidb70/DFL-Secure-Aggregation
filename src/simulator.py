@@ -52,7 +52,7 @@ def run_clients(num_clients):
 
 def start_simulation(params):
     """
-    Starts the simulation with the experiment parameters.
+    Starts the simulation with the experiment arguments.
 
     - Creates a network graph, adds users to the network, and makes connections between them.
     - Starts the clients.

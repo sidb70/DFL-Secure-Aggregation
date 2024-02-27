@@ -1,5 +1,6 @@
 nodes: 10
 edge_density: 1.0 # fully connected
+rounds: 100
 aggregation_type: "mean"
 malicious_proportion: 0.9
 attack_type: "random"
