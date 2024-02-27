@@ -4,7 +4,6 @@ class UserGraph:
     def __init__(self):
         self.nodes = {}
         self.edges = {}
-        self.users = 0
     def add_user(self, user_num, ip, port, malicious=False):
         if user_num in self.nodes:
             return
