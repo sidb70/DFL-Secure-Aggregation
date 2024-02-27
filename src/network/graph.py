@@ -5,10 +5,10 @@ class UserGraph:
         self.nodes = {}
         self.edges = {}
         self.users = 0
-    def add_user(self, user_num, ip, port):
+    def add_user(self, user_num, ip, port, malicious=False):
         if user_num in self.nodes:
             return
-        self.nodes[user_num] = {'ip': ip, 'port': port}
+        self.nodes[user_num] = {'ip': ip, 'port': port, 'malicious': malicious}
         self.edges[user_num] = set()
 
     def make_connections(self, p=1.0, directed=False):
@@ -46,7 +46,8 @@ class UserGraph:
             json[user] = {
                 "ip": self.nodes[user]['ip'],
                 "port": self.nodes[user]['port'],
-                "edges": list(self.get_neighbors(user))
+                "edges": list(self.get_neighbors(user)),
+                "malicious": self.nodes[user]['malicious']
             }
         return json
     def __iter__(self):
