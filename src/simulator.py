@@ -52,14 +52,14 @@ def run_clients(num_clients):
 
 def start_simulation(params):
     """
-    Starts the simulation with the given arguments.
+    Starts the simulation with the experiment parameters.
 
     - Creates a network graph, adds users to the network, and makes connections between them.
     - Starts the clients.
     - Starts the server.
 
     Args:
-        args (argparse.Namespace): The command-line arguments.
+        params (dict): A dictionary of parameters for the simulation.
 
     Returns:
         None
