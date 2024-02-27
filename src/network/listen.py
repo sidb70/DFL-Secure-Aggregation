@@ -22,7 +22,7 @@ class ModelHandler(http.server.SimpleHTTPRequestHandler):
         This method reads the content of the request, decodes it from bytes to string,
         splits it into key-value pairs, converts it into a dictionary, and prints the result.
         Then it sends a response header with status code 200 and a response body of 'POST received'.
-        If a receive handler is defined, it calls the handler with the parsed data.
+        If a model callback is defined, it calls the callback with the parsed data.
 
         """
         global model_callback
@@ -50,7 +50,13 @@ class MyServer(socketserver.TCPServer):
 
 def listen_for_models(timeout:int, port: int, host:str = 'localhost' , callback:Callable=None):
     """
-    Listen for models from neighbors
+    Listens for incoming models on the specified port and host.
+    
+    Args:
+        timeout (int): The amount of time to listen for models (in seconds).
+        port (int): The port number to listen on.
+        host (str, optional): The host address to listen on. Defaults to 'localhost'.
+        callback (Callable, optional): A callback function to be executed when a model is received. Defaults to None.
     """
     global model_callback
     model_callback = callback
@@ -61,8 +67,10 @@ def listen_for_models(timeout:int, port: int, host:str = 'localhost' , callback:
     thread = threading.Thread(target=server.serve_forever)
     thread.start()
     print("Listening on port", port)
+
     # Wait for x amount of time
-    time.sleep(timeout)  # 10 seconds
+    time.sleep(timeout) 
+    
     # Shut down the server
     server.shutdown()
     thread.join()
