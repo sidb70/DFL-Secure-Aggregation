@@ -5,6 +5,11 @@ import requests
 
 log_file=None
 
+def listen_for_models():
+    """
+    Listen for models from neighbors
+    """
+    pass
 def start_client():
     """
     Retrieve the topology from the simulator and TODO
