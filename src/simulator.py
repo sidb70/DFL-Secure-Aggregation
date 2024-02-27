@@ -33,11 +33,33 @@ async def get_topology():
 
 # ______________ Simulator ______________
 def run_clients(num_clients):
+    """
+    Run the specified number of clients.
+
+    Args:
+        num_clients (int): The number of clients to run.
+
+    Returns:
+        None
+    """
     for i in range(num_clients):
         subprocess.Popen(['python3', 'src/client.py', '--simulator', f'localhost:{server_port}', '--id', str(i)])
         print(f'Started client {i}')
 
 def start_simulation(args):
+    """
+    Starts the simulation with the given arguments.
+
+    - Creates a network graph, adds users to the network, and makes connections between them.
+    - Starts the clients.
+    - Starts the server.
+
+    Args:
+        args (argparse.Namespace): The command-line arguments.
+
+    Returns:
+        None
+    """
     global topology
     ### get args
     num_nodes = args.nodes

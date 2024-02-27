@@ -6,6 +6,9 @@ import requests
 log_file=None
 
 def start_client():
+    """
+    Retrieve the topology from the simulator and TODO
+    """
     global log_file
     # get topology
     url = f'http://{args.simulator}/topology'
