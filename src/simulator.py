@@ -6,6 +6,7 @@ import uvicorn
 import subprocess
 import os
 import random
+import yaml
 # ______________ Globals ______________
 toplogy = None
 server_port = 5999
@@ -26,6 +27,7 @@ def read_root():
 
 @app.get("/topology")
 async def get_topology():
+    global topology
     if topology is None:
         return {"error": "topology not set"}
     return topology.to_json()
@@ -48,7 +50,7 @@ def run_clients(num_clients):
         subprocess.Popen(['python3', client_file, '--simulator', f'localhost:{server_port}', '--id', str(i)])
         print(f'Started client {i}')
 
-def start_simulation(args):
+def start_simulation(params):
     """
     Starts the simulation with the given arguments.
 
@@ -64,9 +66,11 @@ def start_simulation(args):
     """
     global topology
     ### get args
-    num_nodes = args.nodes
-    edge_density = args.edge_density
-    malicious_proportion = args.malicious
+    num_nodes = params['nodes']
+    edge_density = params['edge_density']
+    malicious_proportion = params['malicious_proportion']
+    attack_type = params['attack_type']
+    attack_strength = params['attack_strength']
 
     #### create network graph
     topology = graph.create_graph()
@@ -90,12 +94,10 @@ def start_simulation(args):
 
 
 if __name__=='__main__':
-    parser = argparse.ArgumentParser(description='Start simulation of DFL network.')
-    parser.add_argument('--nodes', type=int, default=10, help='Number of nodes in DFL network')
-    parser.add_argument('--edge_density', type=float, default=1.0, help='Density of connections in DFL network')
-    parser.add_argument('--malicious', type=float, default=0.0, help='Proportion of malicious nodes in DFL network')
-    args = parser.parse_args()
-    print(f'Starting simulation with {args.nodes} nodes')
-    print(f"Edge density: {args.edge_density}")
-    print(f"Malicious proportion: {args.malicious}")
-    start_simulation(args)
+    experiment_yaml = os.path.join(os.path.abspath(__file__).strip('simulator.py'), 'experiment.yaml')
+    with open(experiment_yaml) as f:
+        experiment_params = yaml.safe_load(f)
+    print("Starting simulation with the following parameters:\n")
+    print(experiment_params)
+    print()
+    start_simulation(experiment_params)

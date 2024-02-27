@@ -2,14 +2,11 @@ import argparse
 import time
 import os
 import requests
-
+from network import listen
+import yaml
 log_file=None
 
-def listen_for_models():
-    """
-    Listen for models from neighbors
-    """
-    pass
+
 def start_client():
     """
     Retrieve the topology from the simulator and TODO
@@ -36,7 +33,18 @@ def start_client():
     with open(log_file, 'a') as f:
         f.write(f'My neighbors: {neighbors}\n')
 
-    # send a message to each neighbor
+    # get attack params if I am malicious
+    am_malicious = my_info['malicious']
+    with open(log_file, 'a') as f:
+        f.write(f'Am malicious: {am_malicious}\n')
+    if am_malicious:
+        experiment_yaml = os.path.join(os.path.abspath(__file__).strip('client.py'), 'experiment.yaml')
+        with open(experiment_yaml) as f:
+            experiment_params = yaml.safe_load(f)
+        attack_type = experiment_params['attack_type']
+        attack_strength = experiment_params['attack_strength']
+        with open(log_file, 'a') as f:
+            f.write(f'I am an attacker with with attack type "{attack_type}" and strength {attack_strength}\n')
 
     with open(log_file, 'a') as f:
         f.write('Done\n')
