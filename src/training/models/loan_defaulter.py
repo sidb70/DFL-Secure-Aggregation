@@ -34,13 +34,17 @@ ax.legend(['Train Loss', 'Validation Loss'])
 
 
 class LoanDefaulterModel(Model):
-    def __init__(self, data_file: str, num_samples: int, node_hash: int, *args, **kwargs):
+    def __init__(self, data_file: str, num_samples: int, node_hash: int, epochs: int=5, batch_size: int=10,\
+                 *args, **kwargs):
         super().__init__(*args, **kwargs)
         print("Node hash: ",node_hash)
         self.node_hash = node_hash
         self.num_samples = num_samples
+        self.epochs = epochs
+        self.batch_size = batch_size
         self.data = self.get_loan_defaulter_data(data_file)
         self.X_train, self.X_valid, self.y_train, self.y_valid = self.train_test_split()
+        print(f"X_train shape {self.X_train.shape[1]}")
         self.model = torch.nn.Sequential(
                 torch.nn.Linear(self.X_train.shape[1], 100),
                 torch.nn.ReLU(),
@@ -51,10 +55,7 @@ class LoanDefaulterModel(Model):
             )
         self.model.apply(self.init_weights)
 
-    def init_weights(self, model):  
-        if isinstance(model, torch.nn.Linear):
-            torch.nn.init.xavier_uniform_(model.weight)
-            model.bias.data.fill_(0.01)
+
         
     def get_loan_defaulter_data(self,data_file: str):
         all_data = pd.read_csv(data_file)
@@ -72,14 +73,12 @@ class LoanDefaulterModel(Model):
         data = data.astype(float)
 
         return data
-    def set_state_dict_path(self, path):
-        self.state_dict_path = path
     def train_test_split(self):
         #print(f"data shape {self.data.shape[1]}")
 
         mergeddf_sample = self.process_data(self.data)
 
-        #print(f"Merged shape {mergeddf_sample.shape[1]}")
+        # print(f"Merged shape {mergeddf_sample.shape[1]}")
 
         # pipeline to drop na, impute missing values, filter by VIF, and normalize
         num_pipeline = Pipeline([
@@ -104,19 +103,18 @@ class LoanDefaulterModel(Model):
         X_valid_tensor = torch.from_numpy(X_valid).float()
         y_valid_tensor = torch.squeeze(torch.from_numpy(y_valid.to_numpy()).float())
         return X_train_tensor, X_valid_tensor, y_train_tensor, y_valid_tensor
-    def train(self):
+    def train(self, plot=False):
         # define loss function and optimizer
         criterion = torch.nn.BCELoss()
         optimizer = torch.optim.SGD(self.model.parameters(), lr=0.01)
 
         # train 1 epoch, in batches of 10
-        epochs = 20
-        batch_size = 200
+        
         grads = {name: 0 for name, param in self.model.named_parameters()}
-        for epoch in range(epochs):
-            for i in range(0, len(self.X_train), batch_size):
-                X_batch = self.X_train[i:i+batch_size]
-                y_batch = self.y_train[i:i+batch_size]
+        for epoch in range(self.epochs):
+            for i in range(0, len(self.X_train), self.batch_size):
+                X_batch = self.X_train[i:i+self.batch_size]
+                y_batch = self.y_train[i:i+self.batch_size]
                 y_pred = self.model(X_batch).squeeze()
                 loss = criterion(y_pred, y_batch)
                 optimizer.zero_grad()
@@ -131,20 +129,21 @@ class LoanDefaulterModel(Model):
             with torch.no_grad():
                 y_pred = self.model(self.X_valid).squeeze()
                 valid_loss = criterion(y_pred, self.y_valid)
-                #print('Epoch {}, Validation Loss: {}'.format(epoch, valid_loss.item()))
+                print('Epoch {}, Validation Loss: {}'.format(epoch, valid_loss.item()))
 
 
-            losses.append([loss.item(), valid_loss.item()])
+            
+            if plot:
+                losses.append([loss.item(), valid_loss.item()])
+                ax.set_xlim(0, len(losses))
+                line1.set_xdata(range(len(losses)))
+                line1.set_ydata([loss[0] for loss in losses])
+                line2.set_xdata(range(len(losses)))
+                line2.set_ydata([loss[1] for loss in losses])
+                fig.canvas.draw()
+                fig.canvas.flush_events()
 
-            ax.set_xlim(0, len(losses))
-            line1.set_xdata(range(len(losses)))
-            line1.set_ydata([loss[0] for loss in losses])
-            line2.set_xdata(range(len(losses)))
-            line2.set_ydata([loss[1] for loss in losses])
-            fig.canvas.draw()
-            fig.canvas.flush_events()
-
-            #plt.plot(losses)
+                #plt.plot(losses)
         self.state_dict = self.model.state_dict()
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)
@@ -155,30 +154,4 @@ class LoanDefaulterModel(Model):
         y_pred = torch.round(y_pred)
         correct = torch.sum(y_pred == self.y_valid)
         print('Accuracy: {}'.format(correct.item()/len(self.y_valid)))
-class Logger:
-    def __init__(self):
-        pass
-    def log(self, message):
-        print(message)
-if __name__=='__main__':
-    data_path =  os.path.join(parent_dir, 'data/loan_data.csv')
-    print(data_path)
-    model1 = LoanDefaulterModel(data_path, num_samples=2000, node_hash=0)
-    model1.train()
-    model1.evaluate()
-
-    model2 = LoanDefaulterModel(data_path, num_samples=200, node_hash=1)
-    model2.train()
-    model2.evaluate()
-    
-    logger = Logger()
-    fedavg = FedAvg(logger)
-    models = [(model1.state_dict,0.5), (model2.state_dict,0.5)]
-
-    agg_model = fedavg.aggregate(models)
-    print("Aggregated model")
-    model1.load_state_dict(agg_model)
-    model1.evaluate()
-    model2.load_state_dict(agg_model)
-    model2.evaluate()
-
+        
