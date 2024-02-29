@@ -1,4 +1,6 @@
-import argparse
+'''
+This file is the main entry point for the simulator. It sets up the server and runs the clients.
+'''
 from network import graph
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

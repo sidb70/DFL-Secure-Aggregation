@@ -4,20 +4,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn import model_selection
 import torch
-import os
 import matplotlib.pyplot as plt
-import sys
-
-# add the model dir to the path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-base_dir = os.path.dirname(parent_dir)
-sys.path.append(current_dir)
-sys.path.append(parent_dir)
-sys.path.append(base_dir)
-
-from Model import Model
-from aggregation.fedavg import FedAvg
+from .Model import BaseModel
 
 
 
@@ -33,7 +21,7 @@ ax.legend(['Train Loss', 'Validation Loss'])
         
 
 
-class LoanDefaulterModel(Model):
+class LoanDefaulter(BaseModel):
     def __init__(self, data_file: str, num_samples: int, node_hash: int, epochs: int=5, batch_size: int=10,\
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
