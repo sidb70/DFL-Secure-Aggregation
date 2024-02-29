@@ -83,11 +83,10 @@ class Client:
         
 
         modelname = experiment_params['model_name']
-        try:
-            if modelname == 'loan_defaulter':
+        if modelname == 'loan_defaulter':
                 from training.models.loan_defaulter import LoanDefaulter
-                self.model = LoanDefaulter(data_path, num_samples, self.id, epochs, batch_size)
-        except:
+                self.model = LoanDefaulter(data_path, num_samples, self.id, epochs, batch_size, logger)
+        else:
             raise ValueError(f'Unknown model name: {modelname}')
         if log:
             logger.log(f'Loaded model {modelname}\n')

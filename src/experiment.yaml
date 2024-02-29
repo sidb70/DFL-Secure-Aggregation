@@ -1,4 +1,4 @@
-nodes: 10
+nodes: 5
 edge_density: 1.0 # fully connected
 rounds: 10
 model_name: "loan_defaulter"
