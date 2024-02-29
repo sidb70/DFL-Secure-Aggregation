@@ -3,7 +3,6 @@ import time
 import os
 import requests
 from network import listen
-from training.models import Model
 import yaml
 from logger import Logger
 import threading
@@ -23,6 +22,7 @@ class Client:
         self.am_malicious = False
         self.attack_type = None
         self.attack_strength = None
+        self.current_round = 0
         self.rounds = experiment_params['rounds']
         
         self.load_client_info(log=True)
@@ -70,8 +70,8 @@ class Client:
             self.attack_strength = experiment_params['attack_strength']
             if log:
                 logger.log(f'I am an attacker with with attack type "{self.attack_type}" and strength {self.attack_strength}\n')
-        self.recieved_models = []
-        self.recieved_models_lock  = threading.Lock()
+        self.received_msgs = []
+        self.received_msgs_lock  = threading.Lock()
     def load_model(self, log=False):
         """
         Load the model
@@ -98,27 +98,37 @@ class Client:
                                         args=(self.hostname, self.port, 10, \
                                                 self.logger,self.recieve_model))
         listen_thread.start()
-        for round in range(self.rounds):
-            logger.log(f'Round {round}\n')
+        for r in range(self.rounds):
+            logger.log(f'Round {r}\n')
             # train model
             self.model.train()
             self.send_model()
-            # aggregate()
-    def recieve_model(self, model):
-        with self.recieved_models_lock:
-            self.recieved_models.append(model)
-        logger.log(f'Recieved model from {model["id"]}\n')
+            self.aggregate()
+            self.current_round += 1
+    def recieve_model(self, msg: dict):
+        with self.received_msgs_lock:
+            self.received_msgs.append(msg)
+        logger.log(f'received message from {msg["id"]}\n')
     def send_model(self):
         # send model to neighbors
         for neighbor in self.neighbors:
             neighbor_addr = self.topology[neighbor]['ip'] + ':' + str(self.topology[neighbor]['port'])
             url = f'http://{neighbor_addr}/'
-            data = {'id': self.id, 'model': self.model}
+            data = {'id': self.id,'round': self.current_round, 'model': self.model}
             response = requests.post(url, data=data)
             if response.status_code != 200:
                 logger.log(f'Error sending model to {neighbor}: {response.status_code}\n')
             else:
                 logger.log(f'Sent model to {neighbor}\n')
+    def aggregate(self):
+        with self.received_msgs_lock:
+            if len(self.received_msgs) == 0:
+                return
+            # aggregate models
+            for model in self.received_msgs:
+                pass #TODO: self.aggregator.aggregate(model)
+            self.received_msgs = []
+            logger.log(f'Aggregated models\n')
 def main(args, logger):
     client = Client(args.id, args.simulator, logger)
     client.train_fl()

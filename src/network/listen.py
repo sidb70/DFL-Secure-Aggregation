@@ -6,9 +6,9 @@ from typing import Callable
 from logger import Logger
 
 ## Global variable to store the callback
-model_callback = None
+msg_callback = None
 logger = None
-class ModelHandler(http.server.SimpleHTTPRequestHandler):
+class MsgHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         # You can use self.custom_arg1 and self.custom_arg2 here
         self.send_response(200)
@@ -26,7 +26,7 @@ class ModelHandler(http.server.SimpleHTTPRequestHandler):
         If a model callback is defined, it calls the callback with the parsed data.
 
         """
-        global model_callback
+        global msg_callback
         global logger
         content_length = int(self.headers['Content-Length']) # Gets the size of data
         post_data = self.rfile.read(content_length) # Gets the data itself
@@ -40,11 +40,9 @@ class ModelHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200) # Sends a response header
         self.end_headers()
         self.wfile.write(b'POST received') # Sends a response body
-        logger.log("\nReceived model")
         
-        if model_callback is not None:
-            logger.log("Calling model callback\n")
-            model_callback(post_data)
+        if msg_callback is not None:
+            msg_callback(post_data)
 
 
 class MyServer(socketserver.TCPServer):
@@ -60,12 +58,12 @@ def listen_for_models(host:str ,port: int, timeout:int, log: Logger, callback:Ca
         host (str, optional): The host address to listen on. Defaults to 'localhost'.
         callback (Callable, optional): A callback function to be executed when a model is received. Defaults to None.
     """
-    global model_callback
+    global msg_callback
     global logger
-    model_callback = callback
+    msg_callback = callback
     logger = log
     # Create the server
-    server = MyServer((host, port), ModelHandler)
+    server = MyServer((host, port), MsgHandler)
     # Run the server in a separate thread
     thread = threading.Thread(target=server.serve_forever)
     thread.start()
