@@ -7,7 +7,7 @@ from logger import Logger
 
 ## Global variable to store the callback
 model_callback = None
-
+logger = None
 class ModelHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         # You can use self.custom_arg1 and self.custom_arg2 here
@@ -27,6 +27,7 @@ class ModelHandler(http.server.SimpleHTTPRequestHandler):
 
         """
         global model_callback
+        global logger
         content_length = int(self.headers['Content-Length']) # Gets the size of data
         post_data = self.rfile.read(content_length) # Gets the data itself
 
@@ -39,17 +40,17 @@ class ModelHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200) # Sends a response header
         self.end_headers()
         self.wfile.write(b'POST received') # Sends a response body
-        print("\nReceived model")
+        logger.log("\nReceived model")
         
         if model_callback is not None:
-            print("Calling model callback\n")
+            logger.log("Calling model callback\n")
             model_callback(post_data)
 
 
 class MyServer(socketserver.TCPServer):
     allow_reuse_address = True
 
-def listen_for_models(host:str ,port: int, timeout:int, logger: Logger, callback:Callable=None):
+def listen_for_models(host:str ,port: int, timeout:int, log: Logger, callback:Callable=None):
     """
     Listens for incoming models on the specified port and host.
     
@@ -60,9 +61,10 @@ def listen_for_models(host:str ,port: int, timeout:int, logger: Logger, callback
         callback (Callable, optional): A callback function to be executed when a model is received. Defaults to None.
     """
     global model_callback
+    global logger
     model_callback = callback
+    logger = log
     # Create the server
-    
     server = MyServer((host, port), ModelHandler)
     # Run the server in a separate thread
     thread = threading.Thread(target=server.serve_forever)

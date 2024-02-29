@@ -6,6 +6,7 @@ from sklearn import model_selection
 import torch
 import matplotlib.pyplot as plt
 from .Model import BaseModel
+from logger import Logger
 
 
 
@@ -22,11 +23,12 @@ ax.legend(['Train Loss', 'Validation Loss'])
 
 
 class LoanDefaulter(BaseModel):
-    def __init__(self, data_file: str, num_samples: int, node_hash: int, epochs: int, batch_size: int):
+    def __init__(self, data_file: str, num_samples: int, node_hash: int, epochs: int, batch_size: int, logger: Logger):
         super().__init__(data_file, num_samples, node_hash, epochs, batch_size)
+        self.logger = logger
         self.data = self.get_loan_defaulter_data(data_file)
         self.X_train, self.X_valid, self.y_train, self.y_valid = self.train_test_split()
-        print(f"X_train shape {self.X_train.shape[1]}")
+        self.logger.log(f"X_train shape {self.X_train.shape[1]}")
         self.model = torch.nn.Sequential(
                 torch.nn.Linear(self.X_train.shape[1], 100),
                 torch.nn.ReLU(),
@@ -37,7 +39,6 @@ class LoanDefaulter(BaseModel):
             )
         self.model.apply(self.init_weights)
         self.state_dict = self.model.state_dict()
-
 
         
     def get_loan_defaulter_data(self,data_file: str):
@@ -57,11 +58,11 @@ class LoanDefaulter(BaseModel):
 
         return data
     def train_test_split(self):
-        #print(f"data shape {self.data.shape[1]}")
+        #self.logger.log(f"data shape {self.data.shape[1]}")
 
         mergeddf_sample = self.process_data(self.data)
 
-        # print(f"Merged shape {mergeddf_sample.shape[1]}")
+        # self.logger.log(f"Merged shape {mergeddf_sample.shape[1]}")
 
         # pipeline to drop na, impute missing values, filter by VIF, and normalize
         num_pipeline = Pipeline([
@@ -73,7 +74,7 @@ class LoanDefaulter(BaseModel):
         X = mergeddf_sample.drop(['TARGET'],axis=1)
         X = num_pipeline.fit_transform(X)
 
-        print(f"X shape {X.shape[1]}")
+        self.logger.log(f"X shape {X.shape[1]}")
 
         y = mergeddf_sample['TARGET']
 
@@ -105,14 +106,14 @@ class LoanDefaulter(BaseModel):
                 for name, param in self.model.named_parameters():
                     grads[name] += param.grad
                 optimizer.step()
-                #print(grads['0.bias'])
-            #print('Epoch {}, Loss: {}'.format(epoch, loss.item()))
+                #self.logger.log(grads['0.bias'])
+            #self.logger.log('Epoch {}, Loss: {}'.format(epoch, loss.item()))
 
             # validation loss
             with torch.no_grad():
                 y_pred = self.model(self.X_valid).squeeze()
                 valid_loss = criterion(y_pred, self.y_valid)
-                print('Epoch {}, Validation Loss: {}'.format(epoch, valid_loss.item()))
+                self.logger.log('Epoch {}, Validation Loss: {}'.format(epoch, valid_loss.item()))
 
 
             
@@ -136,5 +137,5 @@ class LoanDefaulter(BaseModel):
         y_pred = self.model(self.X_valid).squeeze()
         y_pred = torch.round(y_pred)
         correct = torch.sum(y_pred == self.y_valid)
-        print('Accuracy: {}'.format(correct.item()/len(self.y_valid)))
+        self.logger.log('Accuracy: {}'.format(correct.item()/len(self.y_valid)))
         
