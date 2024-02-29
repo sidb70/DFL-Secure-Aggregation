@@ -71,8 +71,6 @@ def start_simulation(params):
     num_nodes = params['nodes']
     edge_density = params['edge_density']
     malicious_proportion = params['malicious_proportion']
-    attack_type = params['attack_type']
-    attack_strength = params['attack_strength']
 
     #### create network graph
     topology = graph.create_graph()
