@@ -1,20 +1,14 @@
 import os
 import sys
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-base_dir = os.path.dirname(parent_dir)
-sys.path.append(current_dir)
-sys.path.append(parent_dir)
-sys.path.append(base_dir)
 
 from loan_defaulter import LoanDefaulterModel
-from aggregation.fedavg import FedAvg
+from aggregation.strategies import FedAvg
 
 class DummyLogger:
     def log(self, message):
         print(message)
-data_path =  os.path.join(parent_dir, 'data/loan_data.csv')
+data_path =  os.path.join("/Users/sidb/Development/DFL-Secure-Aggregation/src/training/data/loan_data.csv")
 
 n_samples1 = 401
 n_samples2 = 203
