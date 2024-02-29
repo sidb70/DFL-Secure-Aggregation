@@ -6,7 +6,7 @@ data_path: "/Users/sidb/Development/DFL-Secure-Aggregation/src/training/data/loa
 num_samples: 800
 epochs: 10
 batch_size: 20
-aggregation_type: "mean"
+aggregation: "fedavg"
 malicious_proportion: 0.9
 attack_type: "random"
 attack_strength: 0.2

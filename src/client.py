@@ -2,11 +2,17 @@ import argparse
 import time
 import os
 import requests
+import json
 from network import listen
 import yaml
 from logger import Logger
 import threading
 from network import listen
+from training.models.torch.loan_defaulter import LoanDefaulter
+import torch
+from aggregation.strategies import(
+    FedAvg
+)
 # Load experiment parameters
 with open(os.path.join(os.path.abspath(__file__).strip('client.py'), 'experiment.yaml')) as f:
         experiment_params = yaml.safe_load(f)
@@ -22,13 +28,11 @@ class Client:
         self.am_malicious = False
         self.attack_type = None
         self.attack_strength = None
-        self.current_round = 0
-        self.rounds = experiment_params['rounds']
         
-        self.load_client_info(log=True)
+        self.load_attributes(log=True)
+        self.load_aggregator(log=True)
         self.load_model(log=True)
-
-    def load_client_info(self,log=False):
+    def load_attributes(self,log=False):
         """
         Get client info from the simulator manager
             - hostname
@@ -41,24 +45,26 @@ class Client:
         # get topology
         url = f'http://{args.simulator}/topology'
         response = requests.get(url)
+        self.current_round = 0
+        self.rounds = experiment_params['rounds']
 
         if response.status_code != 200:
             logger.log(f'Error getting topology: {response.status_code}\n')
             return
-        self.topology = response.json()
-        # convert keys to int
-        self.topology = {int(k):v for k,v in self.topology.items()}
+        topology_json = response.json()
+        # convert user ids to int
+        self.topology = {int(node_id):val for node_id,val in topology_json.items()}
 
-        # get my
+        # get my info
         my_info = self.topology[int(args.id)]
         self.hostname = my_info['ip']
         self.port = my_info['port']
 
         # get neighbors
         self.neighbors = my_info['edges']
-                
+        # get role
         self.am_malicious = my_info['malicious']
-        
+
         if log:
             logger.log(f'Got topology: {self.topology}\n')
             logger.log(f'My info: {my_info}\n')
@@ -70,8 +76,9 @@ class Client:
             self.attack_strength = experiment_params['attack_strength']
             if log:
                 logger.log(f'I am an attacker with with attack type "{self.attack_type}" and strength {self.attack_strength}\n')
+        ## initialize received messages and lock
         self.received_msgs = []
-        self.received_msgs_lock  = threading.Lock()
+        self.received_msgs_lock  = threading.Lock() 
     def load_model(self, log=False):
         """
         Load the model
@@ -84,14 +91,22 @@ class Client:
 
         modelname = experiment_params['model_name']
         if modelname == 'loan_defaulter':
-                from training.models.loan_defaulter import LoanDefaulter
                 self.model = LoanDefaulter(data_path, num_samples, self.id, epochs, batch_size, logger)
         else:
             raise ValueError(f'Unknown model name: {modelname}')
         if log:
             logger.log(f'Loaded model {modelname}\n')
-        
-
+    def load_aggregator(self, log=False):
+        """
+        Load the aggregator
+        """
+        aggregation = experiment_params['aggregation']
+        if aggregation=='fedavg':
+            self.aggregator = FedAvg(self.logger)
+        else:
+            raise ValueError(f'Unknown aggregation type: {aggregation}')
+        if log:
+            logger.log(f'Loaded aggregator {aggregation}\n')
     def train_fl(self):
         # listen on a separate thread
         listen_thread = threading.Thread(target=listen.listen_for_models,\
@@ -107,14 +122,24 @@ class Client:
             self.current_round += 1
     def recieve_model(self, msg: dict):
         with self.received_msgs_lock:
+            msg['id'] = int(msg['id'])
+            msg['round'] = int(msg['round'])
+            msg['num_samples'] = int(msg['num_samples'])
+            model_path = os.path.join(os.path.abspath(__file__).strip('client.py'), 'training', \
+                                    'models', 'clients', f'client_{msg["id"]}.pt')
+            msg['model'] = torch.load(model_path)
+            
             self.received_msgs.append(msg)
         logger.log(f'received message from {msg["id"]}\n')
     def send_model(self):
         # send model to neighbors
+        model_path = os.path.join(os.path.abspath(__file__).strip('client.py'), 'training', \
+                                  'models', 'clients', f'client_{self.id}.pt')
+        torch.save(self.model.state_dict, model_path)
         for neighbor in self.neighbors:
             neighbor_addr = self.topology[neighbor]['ip'] + ':' + str(self.topology[neighbor]['port'])
             url = f'http://{neighbor_addr}/'
-            data = {'id': self.id,'round': self.current_round, 'model': self.model}
+            data = {'id': self.id,'round': self.current_round, 'num_samples': self.model.num_samples}
             response = requests.post(url, data=data)
             if response.status_code != 200:
                 logger.log(f'Error sending model to {neighbor}: {response.status_code}\n')
@@ -125,8 +150,11 @@ class Client:
             if len(self.received_msgs) == 0:
                 return
             # aggregate models
-            for model in self.received_msgs:
-                pass #TODO: self.aggregator.aggregate(model)
+            
+            models = [(msg['model'], msg['num_samples']) for msg in self.received_msgs \
+                      if msg['round'] >= self.current_round]
+            aggregated_model = self.aggregator.aggregate(models)
+            self.model.load_state_dict(aggregated_model)
             self.received_msgs = []
             logger.log(f'Aggregated models\n')
 def main(args, logger):
