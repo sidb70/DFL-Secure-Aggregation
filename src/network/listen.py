@@ -3,6 +3,7 @@ import socketserver
 import threading
 import time
 from typing import Callable
+from logger import Logger
 
 ## Global variable to store the callback
 model_callback = None
@@ -48,7 +49,7 @@ class ModelHandler(http.server.SimpleHTTPRequestHandler):
 class MyServer(socketserver.TCPServer):
     allow_reuse_address = True
 
-def listen_for_models(timeout:int, port: int, host:str = 'localhost' , callback:Callable=None):
+def listen_for_models(host:str ,port: int, timeout:int, logger: Logger, callback:Callable=None):
     """
     Listens for incoming models on the specified port and host.
     
@@ -66,11 +67,12 @@ def listen_for_models(timeout:int, port: int, host:str = 'localhost' , callback:
     # Run the server in a separate thread
     thread = threading.Thread(target=server.serve_forever)
     thread.start()
-    print("Listening on port", port)
+    logger.log("Listening on port "+ str(port))
 
     # Wait for x amount of time
     time.sleep(timeout) 
     
+    logger.log("Stop listening")
     # Shut down the server
     server.shutdown()
     thread.join()
