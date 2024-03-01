@@ -46,11 +46,19 @@ def run_clients(num_clients):
     Returns:
         None
     """
+    processes = []
     for i in range(num_clients):
         # run as separate process to avoid GIL
-        client_file = os.path.join(os.path.abspath(__file__).strip('simulator.py'), 'client.py')
-        subprocess.Popen(['python3', client_file, '--simulator', f'localhost:{server_port}', '--id', str(i)])
+        client_file = os.path.join('src','client.py')
+        process = subprocess.Popen(['python3', client_file, '--simulator', f'localhost:{server_port}', '--id', str(i)])
+        processes.append(process)
         print(f'Started client {i}')
+    return processes
+def wait_for_clients(processes: list):
+    for process in processes:
+        process.wait()
+    print('All clients finished')
+        
 
 def start_simulation(params):
     """
@@ -83,18 +91,22 @@ def start_simulation(params):
     
     #### add edges to graph
     topology.make_connections(p=edge_density)
-
+    # save topology
+    topology.save(os.path.join(os.path.abspath(__file__).strip('simulator.py'),'config','topology.json'))
+ 
     # print(topology)
     # print()
     # print(topology.to_json())
 
-    run_clients(num_nodes)
+    processes = run_clients(num_nodes)
+    wait_for_clients(processes)
 
-    uvicorn.run(app, host="localhost", port=server_port)
+    #
+    # uvicorn.run(app, host="localhost", port=server_port)
 
 
 if __name__=='__main__':
-    experiment_yaml = os.path.join(os.path.abspath(__file__).strip('simulator.py'), 'experiment.yaml')
+    experiment_yaml = os.path.join('src','config', 'experiment.yaml')
     with open(experiment_yaml) as f:
         experiment_params = yaml.safe_load(f)
     print("Starting simulation with the following parameters:\n")
