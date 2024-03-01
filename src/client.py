@@ -14,8 +14,8 @@ from aggregation.strategies import(
     FedAvg
 )
 # Load experiment parameters
-with open(os.path.join(os.path.abspath(__file__).strip('client.py'), 'experiment.yaml')) as f:
-        experiment_params = yaml.safe_load(f)
+with open(os.path.join('src','config', 'experiment.yaml')) as f:
+    experiment_params = yaml.safe_load(f)
 
 class Client:
     def __init__(self, id_num: int, simulator_addr: str, logger: Logger):
@@ -43,17 +43,16 @@ class Client:
             - attack_strength
         """
         # get topology
-        url = f'http://{args.simulator}/topology'
-        response = requests.get(url)
+        topology_json_file = os.path.join('src', 'config', 'topology.json')
+        with open(topology_json_file) as f:
+            topology_json = json.load(f)
+        self.topology = {int(node_id):val for node_id,val in topology_json.items()}
+        if log:
+            logger.log(f'Loaded topology from {topology_json_file}\n')
         self.current_round = 0
         self.rounds = experiment_params['rounds']
 
-        if response.status_code != 200:
-            logger.log(f'Error getting topology: {response.status_code}\n')
-            return
-        topology_json = response.json()
-        # convert user ids to int
-        self.topology = {int(node_id):val for node_id,val in topology_json.items()}
+        
 
         # get my info
         my_info = self.topology[int(args.id)]
@@ -125,7 +124,7 @@ class Client:
             msg['id'] = int(msg['id'])
             msg['round'] = int(msg['round'])
             msg['num_samples'] = int(msg['num_samples'])
-            model_path = os.path.join(os.path.abspath(__file__).strip('client.py'), 'training', \
+            model_path = os.path.join('src', 'training', \
                                     'models', 'clients', f'client_{msg["id"]}.pt')
             msg['model'] = torch.load(model_path)
             
@@ -153,6 +152,7 @@ class Client:
             
             models = [(msg['model'], msg['num_samples']) for msg in self.received_msgs \
                       if msg['round'] >= self.current_round]
+            models.append((self.model.state_dict, self.model.num_samples))
             aggregated_model = self.aggregator.aggregate(models)
             self.model.load_state_dict(aggregated_model)
             self.received_msgs = []
@@ -162,7 +162,7 @@ def main(args, logger):
     client.train_fl()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Start simulation of DFL network.')
+    parser = argparse.ArgumentParser(description='Start a DFL node.')
     parser.add_argument('--simulator', type=str, help='ip:port of the simulator')
     parser.add_argument('--id', type=int, help='id of this client')
     args = parser.parse_args()

@@ -1,5 +1,5 @@
 import random
-
+import json
 class UserGraph:
     def __init__(self):
         self.nodes = {}
@@ -40,15 +40,18 @@ class UserGraph:
             return self.edges[user]
         return set()
     def to_json(self):
-        json = {}
+        graph_dict = {}
         for user in self.nodes.keys():
-            json[user] = {
+            graph_dict[user] = {
                 "ip": self.nodes[user]['ip'],
                 "port": self.nodes[user]['port'],
                 "edges": list(self.get_neighbors(user)),
                 "malicious": self.nodes[user]['malicious']
             }
-        return json
+        return json.dumps(graph_dict)
+    def save(self, filename):
+        with open(filename, 'w') as f:
+            f.write(self.to_json())
     def __iter__(self):
         return iter(self.nodes)
     
