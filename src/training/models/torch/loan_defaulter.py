@@ -6,7 +6,7 @@ from sklearn import model_selection
 import torch
 import matplotlib.pyplot as plt
 from .Model import BaseModel
-from logger import Logger
+from logging import Logger
 
 
 
@@ -55,6 +55,8 @@ class LoanDefaulter(BaseModel):
 
         # convert all columns to float
         data = data.astype(float)
+
+        data = data.fillna(0)
 
         return data
     def train_test_split(self):
