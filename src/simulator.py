@@ -4,11 +4,13 @@ This file is the main entry point for the simulator. It sets up the server and r
 from network import graph
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
+import torch
 import subprocess
 import os
 import random
 import yaml
+import logging
+import eval
 # ______________ Globals ______________
 toplogy = None
 server_port = 5999
@@ -58,7 +60,12 @@ def wait_for_clients(processes: list):
     for process in processes:
         process.wait()
     print('All clients finished')
-        
+
+def eval_global_model():
+    """
+    Evaluate the global model.
+    """
+    eval.eval_global_model()
 
 def start_simulation(params):
     """
@@ -100,6 +107,7 @@ def start_simulation(params):
 
     processes = run_clients(num_nodes)
     wait_for_clients(processes)
+    eval_global_model()
 
     #
     # uvicorn.run(app, host="localhost", port=server_port)
