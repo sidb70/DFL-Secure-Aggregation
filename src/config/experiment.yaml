@@ -7,6 +7,6 @@ num_samples: 800
 epochs: 10
 batch_size: 20
 aggregation: "fedavg"
-malicious_proportion: 0.9
-attack_type: "random"
-attack_strength: 0.2
+malicious_proportion: 0.8
+attack_type: "noise"
+attack_strength: 100000

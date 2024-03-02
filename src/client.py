@@ -13,6 +13,7 @@ import torch
 from aggregation.strategies import(
     FedAvg
 )
+from attack import attacks
 # Load experiment parameters
 with open(os.path.join('src','config', 'experiment.yaml')) as f:
     experiment_params = yaml.safe_load(f)
@@ -106,6 +107,11 @@ class Client:
             raise ValueError(f'Unknown aggregation type: {aggregation}')
         if log:
             logger.log(f'Loaded aggregator {aggregation}\n')
+
+        if self.am_malicious:
+            self.attacker = attacks.create_attacker(self.attack_type, self.attack_strength, self.logger)
+            if log:
+                logger.log(f'Loaded attacker with type {self.attack_type} and strength {self.attack_strength}\n')
     def train_fl(self):
         # listen on a separate thread
         listen_thread = threading.Thread(target=listen.listen_for_models,\
@@ -133,8 +139,12 @@ class Client:
     def send_model(self):
         # send model to neighbors
         model_path = os.path.join(os.path.abspath(__file__).strip('client.py'), 'training', \
-                                  'models', 'clients', f'client_{self.id}.pt')
-        torch.save(self.model.state_dict, model_path)
+                                    'models', 'clients', f'client_{self.id}.pt')
+        if not self.am_malicious:
+            torch.save(self.model.state_dict, model_path)
+        else:
+            attack_model = self.attacker.attack(self.model.state_dict)
+            torch.save(attack_model, model_path)
         for neighbor in self.neighbors:
             neighbor_addr = self.topology[neighbor]['ip'] + ':' + str(self.topology[neighbor]['port'])
             url = f'http://{neighbor_addr}/'
