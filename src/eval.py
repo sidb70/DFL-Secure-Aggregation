@@ -21,7 +21,7 @@ def eval_global_model():
     models = [os.path.join('src','training','models','clients',f'client_{i}.pt') for i in range(5)]
     models = [(torch.load(model), experiment_params['num_samples']) for model in models]
     aggregated_model = FedAvg(DummyLogger()).aggregate(models)
-    if experiment_params['model'] == 'loan_defaulter':
+    if experiment_params['model_name'] == 'loan_defaulter':
         model = LoanDefaulter("/Users/sidb/Development/DFL-Secure-Aggregation/src/training/data/loan_data.csv", \
                                 num_samples=10000, node_hash=0, epochs=10, batch_size=100, logger=DummyLogger())
     else:
