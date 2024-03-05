@@ -163,3 +163,4 @@ cython_debug/
 .src/training/models/clients
 .src/config/**
 .src/config/topology.json
+*.pt
