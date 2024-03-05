@@ -9,7 +9,10 @@ from strategies import FedAvg
 class DummyLogger:
     def log(self, message):
         print(message)
-data_path =  os.path.join("/Users/sidb/Development/DFL-Secure-Aggregation/src/training/data/loan_data.csv")
+
+# data_path =  os.path.join("/Users/sidb/Development/DFL-Secure-Aggregation/src/training/data/loan_data.csv")
+data_path = os.path.join(os.getcwd(), 'src', 'training', 'data', 'loan_data.csv')
+print("data_path", data_path)
 
 n_samples1 = 100
 n_samples2 = 100

@@ -17,7 +17,9 @@ def eval_global_model():
     models = [os.path.join('src','training','models','clients',f'client_{i}.pt') for i in range(5)]
     models = [(torch.load(model), experiment_params['num_samples']) for model in models]
     aggregated_model = FedAvg(DummyLogger()).aggregate(models)
-    loan_model = LoanDefaulter("/Users/sidb/Development/DFL-Secure-Aggregation/src/training/data/loan_data.csv", \
+    cwd = os.getcwd()
+    data_path = os.path.join(cwd, 'src', 'training', 'data', 'loan_data.csv')
+    loan_model = LoanDefaulter(data_path,
                                num_samples=10000, node_hash=0, epochs=10, batch_size=100, logger=DummyLogger())
     loan_model.model.load_state_dict(aggregated_model)
     loan_model.evaluate()

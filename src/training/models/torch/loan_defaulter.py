@@ -23,10 +23,10 @@ ax.legend(['Train Loss', 'Validation Loss'])
 
 
 class LoanDefaulter(BaseModel):
-    def __init__(self, data_file: str, num_samples: int, node_hash: int, epochs: int, batch_size: int, logger: Logger):
-        super().__init__(data_file, num_samples, node_hash, epochs, batch_size)
+    def __init__(self, data_path: str, num_samples: int, node_hash: int, epochs: int, batch_size: int, logger: Logger):
+        super().__init__(data_path, num_samples, node_hash, epochs, batch_size)
         self.logger = logger
-        self.data = self.get_loan_defaulter_data(data_file)
+        self.data = self.get_loan_defaulter_data(data_path)
         self.X_train, self.X_valid, self.y_train, self.y_valid = self.train_test_split()
         self.logger.log(f"X_train shape {self.X_train.shape[1]}")
         self.model = torch.nn.Sequential(
@@ -40,7 +40,7 @@ class LoanDefaulter(BaseModel):
         self.model.apply(self.init_weights)
         self.state_dict = self.model.state_dict()
 
-        
+
     def get_loan_defaulter_data(self,data_file: str):
         all_data = pd.read_csv(data_file)
         

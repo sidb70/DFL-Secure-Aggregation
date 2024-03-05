@@ -12,6 +12,10 @@ class NoiseInjectionAttack():
         self.logger = logger
 
     def attack(self, received_weights):
+        """
+        Perform noise injection attack on the received weights. Takes a dictionary containing the received weights.
+        Returns A dictionary containing the noise injected weights.
+        """
         self.logger.log("[NoiseInjectionAttack] Performing noise injection attack")
         lkeys = list(received_weights.keys())
         for k in lkeys:

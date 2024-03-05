@@ -140,6 +140,8 @@ class Client:
         # send model to neighbors
         model_path = os.path.join(os.path.abspath(__file__).strip('client.py'), 'training', \
                                     'models', 'clients', f'client_{self.id}.pt')
+        print('model_path', model_path)
+
         if not self.am_malicious:
             torch.save(self.model.state_dict, model_path)
         else:
@@ -167,6 +169,7 @@ class Client:
             self.model.load_state_dict(aggregated_model)
             self.received_msgs = []
             logger.log(f'Aggregated models\n')
+
 def main(args, logger):
     client = Client(args.id, args.simulator, logger)
     client.train_fl()
