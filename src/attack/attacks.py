@@ -25,3 +25,5 @@ class NoiseInjectionAttack():
 def create_attacker(attack_type, attack_strength, logger):
     if attack_type == 'noise':
         return NoiseInjectionAttack(logger, attack_strength)
+    else:
+        raise ValueError(f'Unknown attack type: {attack_type}')
