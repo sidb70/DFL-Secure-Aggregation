@@ -48,7 +48,7 @@ class MsgHandler(http.server.SimpleHTTPRequestHandler):
 class MyServer(socketserver.TCPServer):
     allow_reuse_address = True
 
-def listen_for_models(host:str ,port: int, timeout:int, log: Logger, callback:Callable=None):
+def listen_for_models(host:str ,port: int,  log: Logger, timeout:int=150,callback:Callable=None):
     """
     Listens for incoming models on the specified port and host.
     

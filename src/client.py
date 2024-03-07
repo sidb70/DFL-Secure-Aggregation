@@ -115,7 +115,7 @@ class Client:
     def train_fl(self):
         # listen on a separate thread
         listen_thread = threading.Thread(target=listen.listen_for_models,\
-                                        args=(self.hostname, self.port, 10, \
+                                        args=(self.hostname, self.port,  \
                                                 self.logger,self.recieve_model))
         listen_thread.start()
         for r in range(self.rounds):
@@ -138,6 +138,8 @@ class Client:
         logger.log(f'received message from {msg["id"]}\n')
     def send_model(self):
         # send model to neighbors
+        if not os.path.exists(os.path.join('src', 'training', 'models', 'clients')):
+            os.makedirs(os.path.join('src', 'training', 'models', 'clients'))
         model_path = os.path.join(os.path.abspath(__file__).strip('client.py'), 'training', \
                                     'models', 'clients', f'client_{self.id}.pt')
         print('model_path', model_path)
@@ -156,6 +158,7 @@ class Client:
                 logger.log(f'Error sending model to {neighbor}: {response.status_code}\n')
             else:
                 logger.log(f'Sent model to {neighbor}\n')
+        time.sleep(1)
     def aggregate(self):
         with self.received_msgs_lock:
             if len(self.received_msgs) == 0:
