@@ -39,7 +39,7 @@ class UserGraph:
         if user in self.edges:
             return self.edges[user]
         return set()
-    def to_json(self):
+    def to_dict(self):
         graph_dict = {}
         for user in self.nodes.keys():
             graph_dict[user] = {
@@ -48,10 +48,10 @@ class UserGraph:
                 "edges": list(self.get_neighbors(user)),
                 "malicious": self.nodes[user]['malicious']
             }
-        return json.dumps(graph_dict)
+        return graph_dict
     def save(self, filename):
         with open(filename, 'w') as f:
-            f.write(self.to_json())
+            json.dump(self.to_dict(), f)
     def __iter__(self):
         return iter(self.nodes)
     
@@ -74,17 +74,3 @@ def create_graph():
     graph = UserGraph()
     return graph
 
-
-
-
-if __name__ == '__main__':
-    graph = create_graph()
-    for i in range(10):
-        graph.add_user(i, f'localhost', 6000+i)
-    graph.make_connections(p=.6)
-    
-    print()
-    print(graph)
-
-    print()
-    print(graph.to_json())
