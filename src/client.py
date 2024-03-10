@@ -33,6 +33,7 @@ class Client:
         self.load_attributes(log=True)
         self.load_aggregator(log=True)
         self.load_model(log=True)
+        self.load_attacker(log=True)
     def load_attributes(self,log=False):
         """
         Get client info from the simulator manager
@@ -59,6 +60,7 @@ class Client:
         my_info = self.topology[int(args.id)]
         self.hostname = my_info['ip']
         self.port = my_info['port']
+        self.listener = listen.ModelListener(self.hostname, self.port)
 
         # get neighbors
         self.neighbors = my_info['edges']
@@ -79,6 +81,8 @@ class Client:
         ## initialize received messages and lock
         self.received_msgs = []
         self.received_msgs_lock  = threading.Lock() 
+
+        listen.set_globals(self.recieve_model, self.logger) # set the callback for the listen module
     def load_model(self, log=False):
         """
         Load the model
@@ -107,17 +111,15 @@ class Client:
             raise ValueError(f'Unknown aggregation type: {aggregation}')
         if log:
             logger.log(f'Loaded aggregator {aggregation}\n')
-
+    def load_attacker(self, log=False):
         if self.am_malicious:
             self.attacker = attacks.create_attacker(self.attack_type, self.attack_strength, self.logger)
             if log:
                 logger.log(f'Loaded attacker with type {self.attack_type} and strength {self.attack_strength}\n')
+        
     def train_fl(self):
         # listen on a separate thread
-        listen_thread = threading.Thread(target=listen.listen_for_models,\
-                                        args=(self.hostname, self.port,  \
-                                                self.logger,self.recieve_model))
-        listen_thread.start()
+        self.listener.listen_for_models()
         for r in range(self.rounds):
             logger.log(f'Round {r}\n')
             # train model
@@ -125,6 +127,11 @@ class Client:
             self.send_model()
             self.aggregate()
             self.current_round += 1
+        logger.log(f'Training complete\n')
+        #time.sleep(5) # wait for other clients to finish
+        self.listener.shutdown()
+
+        
     def recieve_model(self, msg: dict):
         with self.received_msgs_lock:
             msg['id'] = int(msg['id'])
@@ -153,12 +160,18 @@ class Client:
             neighbor_addr = self.topology[neighbor]['ip'] + ':' + str(self.topology[neighbor]['port'])
             url = f'http://{neighbor_addr}/'
             data = {'id': self.id,'round': self.current_round, 'num_samples': self.model.num_samples}
-            response = requests.post(url, data=data)
-            if response.status_code != 200:
-                logger.log(f'Error sending model to {neighbor}: {response.status_code}\n')
-            else:
-                logger.log(f'Sent model to {neighbor}\n')
-        time.sleep(1)
+            try:
+                response = requests.post(url, data=data)
+                if response.status_code != 200:
+                    logger.log(f'Error sending model to {neighbor}: {response.status_code}\n')
+                else:
+                    logger.log(f'Sent model to {neighbor}\n')
+            except ConnectionError as c:
+                logger.log(f'Error sending model to {neighbor}: Connection refused\n')
+                logger.log(f'Error: {c}\n')
+            except Exception as e:
+                logger.log(f'Error sending model to {neighbor}: {e}\n')
+        time.sleep(0.1)
     def aggregate(self):
         with self.received_msgs_lock:
             if len(self.received_msgs) == 0:
