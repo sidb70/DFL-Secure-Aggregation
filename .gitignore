@@ -164,3 +164,5 @@ cython_debug/
 .src/config/**
 .src/config/topology.json
 *.pt
+src/config/topology.json
+src/config/experiment.yaml
