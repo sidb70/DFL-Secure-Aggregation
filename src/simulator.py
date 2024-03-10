@@ -67,9 +67,9 @@ def eval_global_model():
     """
     eval.eval_global_model()
 
-def start_simulation(params):
+def run_simulation(params):
     """
-    Starts the simulation with the experiment arguments.
+    Runs the simulation with the experiment arguments.
 
     - Creates a network graph, adds users to the network, and makes connections between them.
     - Starts the clients.
@@ -92,14 +92,17 @@ def start_simulation(params):
     print(f'Created topology with {num_nodes} nodes')
 
     #### add users to network
+    # choose malicious nodes
+    malicous_nodes = random.sample(range(num_nodes), int(malicious_proportion*num_nodes))
+    print("Malicious nodes: ", malicous_nodes)
     for i in range(num_nodes):
-        is_malicious =  random.random() < malicious_proportion
+        is_malicious = i in malicous_nodes
         topology.add_user(i, f'localhost', 6000+i, malicious=is_malicious)
     
     #### add edges to graph
     topology.make_connections(p=edge_density)
     # save topology
-    topology.save(os.path.join(os.path.abspath(__file__).strip('simulator.py'),'config','topology.json'))
+    topology.save(os.path.join(os.getcwd(), 'src','config','topology.json'))
  
     # print(topology)
     # print()
@@ -109,6 +112,11 @@ def start_simulation(params):
     wait_for_clients(processes)
     eval_global_model()
 
+    # delete models
+        # clear model directory
+    model_dir = os.path.join('src','training','models','clients')
+    for file in os.listdir(model_dir):
+        os.remove(os.path.join(model_dir, file))
     #
     # uvicorn.run(app, host="localhost", port=server_port)
 
@@ -120,4 +128,4 @@ if __name__=='__main__':
     print("Starting simulation with the following parameters:\n")
     print(experiment_params)
     print()
-    start_simulation(experiment_params)
+    run_simulation(experiment_params)
