@@ -108,11 +108,8 @@ class Median:
             )
             return None
 
-        models = list(models.values())
         models_params = [m for m, _ in models]
 
-        # Total Samples
-        total_samples = sum([y for _, y in models])
         total_models = len(models)
 
         # Create a Zero Model

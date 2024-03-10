@@ -11,7 +11,8 @@ from network import listen
 from training.models.torch.loan_defaulter import LoanDefaulter
 import torch
 from aggregation.strategies import(
-    FedAvg
+    FedAvg,
+    Median
 )
 from attack import attacks
 # Load experiment parameters
@@ -107,6 +108,8 @@ class Client:
         aggregation = experiment_params['aggregation']
         if aggregation=='fedavg':
             self.aggregator = FedAvg(self.logger)
+        elif aggregation=='median':
+            self.aggregator = Median(self.logger)
         else:
             raise ValueError(f'Unknown aggregation type: {aggregation}')
         if log:
@@ -177,9 +180,8 @@ class Client:
             if len(self.received_msgs) == 0:
                 return
             # aggregate models
-            
             models = [(msg['model'], msg['num_samples']) for msg in self.received_msgs \
-                      if msg['round'] >= self.current_round]
+                        if msg['round'] >= self.current_round]
             models.append((self.model.state_dict, self.model.num_samples))
             aggregated_model = self.aggregator.aggregate(models)
             self.model.load_state_dict(aggregated_model)
