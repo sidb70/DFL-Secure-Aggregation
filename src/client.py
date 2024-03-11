@@ -140,10 +140,9 @@ class Client:
         msg['round'] = int(msg['round'])
         msg['num_samples'] = int(msg['num_samples'])
         model_path= os.path.join(os.getcwd(), 'src', 'training', 'models', 'clients', f'client_{msg["id"]}.pt')  
+        msg['model'] = torch.load(model_path)
         with self.received_msgs_lock:
             self.received_msgs[msg['round']][msg['id']] = msg
-            self.received_msgs[msg['round']][msg['id']]['model'] = torch.load(model_path)
-            
         logger.log(f'received message from {msg["id"]} for round {msg["round"]}\n')
     def send_model(self):
         # send model to neighbors
@@ -173,6 +172,7 @@ class Client:
         if self.is_synch:
             waiting_for = set(self.neighbors)
             while len(waiting_for)>0:
+                # wait for all neighbors to send their models
                 with self.received_msgs_lock:
                     for neighbor in self.neighbors:
                         if neighbor in waiting_for and self.received_msgs[self.current_round][neighbor] is not None:
@@ -181,12 +181,10 @@ class Client:
                 if len(waiting_for) > 0:
                     logger.log(f'Waiting for {waiting_for}\n')
         with self.received_msgs_lock:
-            if len(self.received_msgs) == 0:
-                logger.log(f'No messages received\n')
-                return
             # aggregate models
             models = [(msg['model'], msg['num_samples']) for msg in self.received_msgs[self.current_round].values() \
                         if msg['round'] >= self.current_round]
+            self.received_msgs[self.current_round] = None # send models to garbage collector
         models.append((self.model.state_dict, self.model.num_samples))
         aggregated_model = self.aggregator.aggregate(models)
         self.model.load_state_dict(aggregated_model)
