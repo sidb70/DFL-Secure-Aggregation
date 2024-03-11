@@ -5,6 +5,25 @@ Modified under the GNU General Public License v3.0
 import torch
 import numpy as np
 
+def create_aggregator(aggregator_type, logger):
+    """
+    Create an aggregator based on the aggregator type.
+
+    Args:
+        aggregator_type (str): The type of aggregator to create.
+        logger (Logger): A logger object to log messages.
+
+    Returns:
+        Aggregator: An aggregator object.
+    """
+    if aggregator_type == 'fedavg':
+        return FedAvg(logger)
+    elif aggregator_type == 'median':
+        return Median(logger)
+    elif aggregator_type == 'krum':
+        return Krum(logger)
+    else:
+        raise ValueError(f'Unknown aggregator type: {aggregator_type}')
 class FedAvg:
     """
     Federated Averaging (FedAvg) [McMahan et al., 2016]
@@ -217,3 +236,4 @@ class Krum:
             accum[layer] = accum[layer] + m[layer]
 
         return accum
+    

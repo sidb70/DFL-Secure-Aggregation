@@ -10,12 +10,7 @@ import threading
 from network import listen
 from training.models.torch.loan_defaulter import LoanDefaulter
 import torch
-from aggregation.strategies import(
-    FedAvg,
-    Median,
-    Krum,
-
-)
+from aggregation import strategies
 from attack import attacks
 # Load experiment parameters
 with open(os.path.join('src','config', 'experiment.yaml')) as f:
@@ -108,19 +103,10 @@ class Client:
         Load the aggregator
         """
         aggregation = experiment_params['aggregation']
-        if aggregation=='fedavg':
-            self.aggregator = FedAvg(self.logger)
-        elif aggregation=='median':
-            self.aggregator = Median(self.logger)
-        elif aggregation=='krum':
-            self.aggregator = Krum(self.logger)
-        else:
-            raise ValueError(f'Unknown aggregation type: {aggregation}')
-        if log:
-            logger.log(f'Loaded aggregator {aggregation}\n')
+        self.aggregator = strategies.create_aggregator(aggregation, self.logger)
     def load_attacker(self, log=False):
         if self.am_malicious:
-            self.attacker = attacks.create_attacker(self.attack_type, self.attack_strength, self.logger)
+            self.attacker = attacks.create_attacker(attack_type=self.attack_type, attack_strength=self.attack_strength, logger=self.logger)
             if log:
                 logger.log(f'Loaded attacker with type {self.attack_type} and strength {self.attack_strength}\n')
         
@@ -213,5 +199,5 @@ if __name__ == '__main__':
     logger.log(f'Client {args.id} started')
     logger.log(f'Simulator: {args.simulator}\n')
     # wait for the simulator to start
-    time.sleep(3)
+    #time.sleep(1)
     main(args, logger)
