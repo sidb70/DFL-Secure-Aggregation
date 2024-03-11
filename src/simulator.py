@@ -11,6 +11,7 @@ import random
 import yaml
 import logging
 import eval
+import signal
 # ______________ Globals ______________
 toplogy = None
 server_port = 5999
@@ -57,6 +58,14 @@ def run_clients(num_clients):
         print(f'Started client {i}')
     return processes
 def wait_for_clients(processes: list):
+    # kill clients if server is killed
+    def kill_clients(signum, frame):
+        for process in processes:
+            process.kill()
+        print('Killed all clients')
+        exit(0)
+    signal.signal(signal.SIGINT, kill_clients)
+    
     for process in processes:
         process.wait()
     print('All clients finished')
@@ -107,7 +116,6 @@ def run_simulation(params):
     # print(topology)
     # print()
     # print(topology.to_json())
-
     processes = run_clients(num_nodes)
     wait_for_clients(processes)
     eval_global_model()
