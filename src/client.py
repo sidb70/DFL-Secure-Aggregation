@@ -54,7 +54,7 @@ class Client:
             logger.log(f'Loaded topology from {topology_json_file}\n')
         self.current_round = 0
         self.rounds = experiment_params['rounds']
-
+        self.is_synch = experiment_params['synchronous']
         
 
         # get my info
@@ -80,7 +80,7 @@ class Client:
             if log:
                 logger.log(f'I am an attacker with with attack type "{self.attack_type}" and strength {self.attack_strength}\n')
         ## initialize received messages and lock
-        self.received_msgs = []
+        self.received_msgs = {round_num: {neighbor:None for neighbor in self.neighbors} for round_num in range(self.rounds)}
         self.received_msgs_lock  = threading.Lock() 
 
         listen.set_globals(self.recieve_model, self.logger) # set the callback for the listen module
@@ -90,7 +90,7 @@ class Client:
         """
         data_path = experiment_params['data_path']
         num_samples = experiment_params['num_samples']
-        epochs = experiment_params['epochs']
+        epochs = experiment_params['epochs_per_round']
         batch_size = experiment_params['batch_size']
         
 
@@ -136,16 +136,15 @@ class Client:
 
         
     def recieve_model(self, msg: dict):
+        msg['id'] = int(msg['id'])
+        msg['round'] = int(msg['round'])
+        msg['num_samples'] = int(msg['num_samples'])
+        model_path= os.path.join(os.getcwd(), 'src', 'training', 'models', 'clients', f'client_{msg["id"]}.pt')  
         with self.received_msgs_lock:
-            msg['id'] = int(msg['id'])
-            msg['round'] = int(msg['round'])
-            msg['num_samples'] = int(msg['num_samples'])
-            model_path = os.path.join('src', 'training', \
-                                    'models', 'clients', f'client_{msg["id"]}.pt')
-            msg['model'] = torch.load(model_path)
+            self.received_msgs[msg['round']][msg['id']] = msg
+            self.received_msgs[msg['round']][msg['id']]['model'] = torch.load(model_path)
             
-            self.received_msgs.append(msg)
-        logger.log(f'received message from {msg["id"]}\n')
+        logger.log(f'received message from {msg["id"]} for round {msg["round"]}\n')
     def send_model(self):
         # send model to neighbors
         if not os.path.exists(os.path.join('src', 'training', 'models', 'clients')):
@@ -163,30 +162,35 @@ class Client:
             neighbor_addr = self.topology[neighbor]['ip'] + ':' + str(self.topology[neighbor]['port'])
             url = f'http://{neighbor_addr}/'
             data = {'id': self.id,'round': self.current_round, 'num_samples': self.model.num_samples}
-            try:
-                response = requests.post(url, data=data)
-                if response.status_code != 200:
-                    logger.log(f'Error sending model to {neighbor}: {response.status_code}\n')
-                else:
-                    logger.log(f'Sent model to {neighbor}\n')
-            except ConnectionError as c:
-                logger.log(f'Error sending model to {neighbor}: Connection refused\n')
-                logger.log(f'Error: {c}\n')
-            except Exception as e:
-                logger.log(f'Error sending model to {neighbor}: {e}\n')
-        time.sleep(0.1)
+
+            response = requests.post(url, data=data)
+            if response.status_code != 200:
+                logger.log(f'Error sending model to {neighbor}: {response.status_code}\n')
+            else:
+                logger.log(f'Sent model to {neighbor} for round {self.current_round}\n')
+        #time.sleep(0.1)
     def aggregate(self):
+        if self.is_synch:
+            waiting_for = set(self.neighbors)
+            while len(waiting_for)>0:
+                with self.received_msgs_lock:
+                    for neighbor in self.neighbors:
+                        if neighbor in waiting_for and self.received_msgs[self.current_round][neighbor] is not None:
+                            waiting_for.remove(neighbor)
+                time.sleep(0.1)
+                if len(waiting_for) > 0:
+                    logger.log(f'Waiting for {waiting_for}\n')
         with self.received_msgs_lock:
             if len(self.received_msgs) == 0:
+                logger.log(f'No messages received\n')
                 return
             # aggregate models
-            models = [(msg['model'], msg['num_samples']) for msg in self.received_msgs \
+            models = [(msg['model'], msg['num_samples']) for msg in self.received_msgs[self.current_round].values() \
                         if msg['round'] >= self.current_round]
-            models.append((self.model.state_dict, self.model.num_samples))
-            aggregated_model = self.aggregator.aggregate(models)
-            self.model.load_state_dict(aggregated_model)
-            self.received_msgs = []
-            logger.log(f'Aggregated models\n')
+        models.append((self.model.state_dict, self.model.num_samples))
+        aggregated_model = self.aggregator.aggregate(models)
+        self.model.load_state_dict(aggregated_model)
+        logger.log(f'Aggregated models\n')
 
 def main(args, logger):
     client = Client(args.id, args.simulator, logger)
