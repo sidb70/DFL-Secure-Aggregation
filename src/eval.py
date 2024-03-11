@@ -5,7 +5,8 @@ from training.models.torch.loan_defaulter import (
 )
 from aggregation.strategies import (
     FedAvg,
-    Median
+    Median,
+    Krum
 )
 import yaml
 import json
@@ -40,6 +41,8 @@ def eval_global_model():
         aggregated_model = FedAvg(DummyLogger()).aggregate(models)
     elif aggregation_strategy == 'median':
         aggregated_model = Median(DummyLogger()).aggregate(models)
+    elif aggregation_strategy == 'krum':
+        aggregated_model = Krum(DummyLogger()).aggregate(models)
     if experiment_params['model_name'] == 'loan_defaulter':
         model = LoanDefaulter("/Users/sidb/Development/DFL-Secure-Aggregation/src/training/data/loan_data.csv", \
                                 num_samples=10000, node_hash=0, epochs=10, batch_size=100, logger=DummyLogger())

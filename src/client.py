@@ -12,7 +12,9 @@ from training.models.torch.loan_defaulter import LoanDefaulter
 import torch
 from aggregation.strategies import(
     FedAvg,
-    Median
+    Median,
+    Krum,
+
 )
 from attack import attacks
 # Load experiment parameters
@@ -110,6 +112,8 @@ class Client:
             self.aggregator = FedAvg(self.logger)
         elif aggregation=='median':
             self.aggregator = Median(self.logger)
+        elif aggregation=='krum':
+            self.aggregator = Krum(self.logger)
         else:
             raise ValueError(f'Unknown aggregation type: {aggregation}')
         if log:
