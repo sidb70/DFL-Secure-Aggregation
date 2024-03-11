@@ -77,7 +77,10 @@ class Client:
             if log:
                 logger.log(f'I am an attacker with with attack type "{self.attack_type}" and strength {self.attack_strength}\n')
         ## initialize received messages and lock
-        self.received_msgs = {round_num: {neighbor:None for neighbor in self.neighbors} for round_num in range(self.rounds)}
+        if self.is_synch:
+            self.received_msgs = {round_num: {neighbor:None for neighbor in self.neighbors} for round_num in range(self.rounds)}
+        else:
+            self.received_msgs = {round_num: {} for round_num in range(self.rounds)}
         self.received_msgs_lock  = threading.Lock() 
 
         listen.set_globals(self.recieve_model, self.logger) # set the callback for the listen module
@@ -129,10 +132,18 @@ class Client:
         msg['id'] = int(msg['id'])
         msg['round'] = int(msg['round'])
         msg['num_samples'] = int(msg['num_samples'])
+        if not self.is_synch and msg['round'] < self.current_round:
+            return
         model_path= os.path.join(os.getcwd(), 'src', 'training', 'models', 'clients', f'client_{msg["id"]}.pt')  
         msg['model'] = torch.load(model_path)
         with self.received_msgs_lock:
-            self.received_msgs[msg['round']][msg['id']] = msg
+            if not self.is_synch and msg['round'] >= self.current_round:
+                # if async, only keep the latest model for each neighbor
+                self.received_msgs[self.current_round][msg['id']] = msg
+            elif self.is_synch:
+                # if synch, keep all models for each round
+                self.received_msgs[msg['round']][msg['id']] = msg
+
         logger.log(f'received message from {msg["id"]} for round {msg["round"]}\n')
     def send_model(self):
         # send model to neighbors
@@ -151,12 +162,18 @@ class Client:
             neighbor_addr = self.topology[neighbor]['ip'] + ':' + str(self.topology[neighbor]['port'])
             url = f'http://{neighbor_addr}/'
             data = {'id': self.id,'round': self.current_round, 'num_samples': self.model.num_samples}
-
-            response = requests.post(url, data=data)
-            if response.status_code != 200:
-                logger.log(f'Error sending model to {neighbor}: {response.status_code}\n')
-            else:
-                logger.log(f'Sent model to {neighbor} for round {self.current_round}\n')
+            try:
+                response = requests.post(url, data=data)
+                if response.status_code != 200:
+                    raise Exception(f'Status code: {response.status_code}')
+                else:
+                    logger.log(f'Sent model to {neighbor} for round {self.current_round}\n')
+            except Exception as e:
+                if self.is_synch:
+                    raise e
+                else:
+                    logger.log(f'Could not send model to {neighbor}: {e}\n')
+                    continue
         #time.sleep(0.1)
     def aggregate(self):
         if self.is_synch:
@@ -170,11 +187,13 @@ class Client:
                 time.sleep(0.1)
                 if len(waiting_for) > 0:
                     logger.log(f'Waiting for {waiting_for}\n')
+        models = []
         with self.received_msgs_lock:
             # aggregate models
-            models = [(msg['model'], msg['num_samples']) for msg in self.received_msgs[self.current_round].values() \
-                        if msg['round'] >= self.current_round]
-            self.received_msgs[self.current_round] = None # send models to garbage collector
+            if len(self.received_msgs[self.current_round]) > 0:
+                models = [(msg['model'], msg['num_samples']) for msg in self.received_msgs[self.current_round].values() \
+                            if msg['round'] >= self.current_round]
+                self.received_msgs[self.current_round] = {} # send models to garbage collector
         models.append((self.model.state_dict, self.model.num_samples))
         aggregated_model = self.aggregator.aggregate(models)
         self.model.load_state_dict(aggregated_model)

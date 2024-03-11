@@ -51,6 +51,7 @@ class MsgHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             logger.log(f"Error: {e}")
             self.send_response(500)
+            raise e
 
 
 class MyServer(socketserver.TCPServer):
