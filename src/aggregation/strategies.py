@@ -5,7 +5,7 @@ Modified under the GNU General Public License v3.0
 import torch
 import numpy as np
 
-def create_aggregator(aggregator_type, logger):
+def create_aggregator(aggregator_type, experiment_params, logger):
     """
     Create an aggregator based on the aggregator type.
 
@@ -22,16 +22,22 @@ def create_aggregator(aggregator_type, logger):
         return Median(logger)
     elif aggregator_type == 'krum':
         return Krum(logger)
+    elif aggregator_type == 'trimmedmean':
+        return TrimmedMean(logger, beta=int(experiment_params['beta']))
     else:
-        raise ValueError(f'Unknown aggregator type: {aggregator_type}')
-class FedAvg:
+        raise ValueError(f"Aggregator type {aggregator_type} not recognized")
+class Aggregator:
+    def __init__(self, logger, **kwargs):
+        self.logger = logger
+        self.kwargs = kwargs
+class FedAvg(Aggregator):
     """
     Federated Averaging (FedAvg) [McMahan et al., 2016]
     Paper: https://arxiv.org/abs/1602.05629
     """
 
-    def __init__(self, logger):
-        self.logger=logger
+    def __init__(self, logger, **kwargs):
+        super().__init__(logger, **kwargs)
 
     def aggregate(self, models: list):
         """
@@ -64,14 +70,14 @@ class FedAvg:
         # self.print_model_size(accum)
 
         return accum
-class Median:
+class Median(Aggregator):
     """
     Median [Dong Yin et al., 2021]
     Paper: https://arxiv.org/pdf/1803.01498.pdf
     """
 
-    def __init__(self, logger):
-        self.logger = logger
+    def __init__(self, logger, **kwargs):
+        super().__init__(logger, **kwargs)
 
     def get_median(self, weights):
         """
@@ -165,14 +171,14 @@ class Median:
                 median = self.get_median(models_layer_weight_flatten)
                 accum[layer] = median.view(l_shape)
         return accum
-class Krum:
+class Krum(Aggregator):
     """
     Krum [Peva Blanchard et al., 2017]
     Paper: https://papers.nips.cc/paper/2017/hash/f4b9ec30ad9f68f89b29639786cb62ef-Abstract.html
     """
 
-    def __init__(self, logger):
-        self.logger = logger
+    def __init__(self, logger, **kwargs):
+        super().__init__(logger, **kwargs)
 
     def aggregate(self, models):
         """
@@ -236,4 +242,119 @@ class Krum:
             accum[layer] = accum[layer] + m[layer]
 
         return accum
-    
+
+
+class TrimmedMean(Aggregator):
+    """
+    TrimmedMean [Dong Yin et al., 2021]
+    Paper: https://arxiv.org/pdf/1803.01498.pdf
+    """
+
+    def __init__(self,logger, **kwargs):
+        super().__init__(logger)
+        self.beta = kwargs.get("beta", 0)
+
+    def get_trimmedmean(self, weights):
+        """
+        For weight list [w1j,w2j,··· ,wmj], removes the largest and
+        smallest β of them, and computes the mean of the remaining
+        m-2β parameters
+
+        Args:
+            weights: weights list, 2D tensor
+        """
+
+        # check if the weight tensor has enough space
+        weight_len = len(weights)
+        if weight_len == 0:
+            self.logger.log(
+                "[TrimmedMean] Trying to aggregate models when there is no models"
+            )
+            return None
+
+        if weight_len <= 2 * self.beta:
+            # logging.error(
+            #     "[TrimmedMean] Number of model should larger than 2 * beta"
+            # )
+            remaining_wrights = weights
+            res = torch.mean(remaining_wrights, 0)
+
+        else:
+            # remove the largest and smallest β items
+            arr_weights = np.asarray(weights)
+            # sort the tensor
+            arr_weights = np.sort(arr_weights, axis=0)
+            nobs = arr_weights.shape[0] # number of observations
+            start = self.beta
+            end = nobs - self.beta
+            atmp = np.partition(arr_weights, (start, end - 1), 0)
+            sl = [slice(None)] * atmp.ndim
+            sl[0] = slice(start, end)
+            # print num of remaining weights after trimming
+            #print(len(atmp[tuple(sl)]))
+            #print(atmp[tuple(sl)])
+            arr_median = np.mean(atmp[tuple(sl)], axis=0)
+            res = torch.tensor(arr_median)
+
+        # get the mean of the remaining weights
+        return res
+
+    def aggregate(self, models):
+        """
+        For each jth model parameter, the master device sorts the jth parameters
+        of the m local models, i.e., w1j,w2j,··· ,wmj, where wij is the
+        jth parameter of the ith local model, removes the largest and
+        smallest β of them, and computes the mean of the remaining
+        m-2β parameters as the jth parameter of the global model.
+
+        Args:
+            models: List of models (node: model, num_samples).
+        """
+        # Check if there are models to aggregate
+        if len(models) == 0:
+            self.logger.log(
+                "[TrimmedMean] Trying to aggregate models when there is no models"
+            )
+            return None
+
+        models_params = [m for m, _ in models]
+
+        # Total Samples
+        total_samples = sum([y for _, y in models])
+        total_models = len(models)
+
+        # Create a Zero Model
+        accum = (models[-1][0]).copy()
+        for layer in accum:
+            accum[layer] = torch.zeros_like(accum[layer])
+
+        # Add weighted models
+        self.logger.log("[TrimmedMean.aggregate] Aggregating models: num={}".format(len(models)))
+
+        # Calculate the trimmedmean for each parameter
+        for layer in accum:
+            weight_layer = accum[layer]
+            # get the shape of layer tensor
+            l_shape = list(weight_layer.shape)
+
+            # get the number of elements of layer tensor
+            number_layer_weights = torch.numel(weight_layer)
+            # if its 0-d tensor
+            if l_shape == []:
+                weights = torch.tensor([models_params[j][layer] for j in range(0, total_models)])
+                weights = weights.double()
+                w = self.get_trimmedmean(weights)
+                accum[layer] = w
+
+            else:
+                # flatten the tensor
+                weight_layer_flatten = weight_layer.view(number_layer_weights)
+
+                # flatten the tensor of each model
+                models_layer_weight_flatten = torch.stack([models_params[j][layer].view(number_layer_weights) for j in range(0, total_models)], 0)
+
+                # get the weight list [w1j,w2j,··· ,wmj], where wij is the jth parameter of the ith local model
+                trimmedmean = self.get_trimmedmean(models_layer_weight_flatten)
+                accum[layer] = trimmedmean.view(l_shape)
+
+        return accum
