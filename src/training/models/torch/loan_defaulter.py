@@ -129,7 +129,7 @@ class LoanDefaulter(BaseModel):
                 fig.canvas.draw()
                 fig.canvas.flush_events()
 
-                #plt.plot(losses)
+                plt.plot(losses)
         self.state_dict = self.model.state_dict()
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)
