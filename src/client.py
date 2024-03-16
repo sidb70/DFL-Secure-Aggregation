@@ -8,6 +8,7 @@ import yaml
 from logger import Logger
 import threading
 from network import listen
+from training.models.torch import loan_defaulter
 from training.models.torch.loan_defaulter import LoanDefaulter
 import torch
 from aggregation import strategies
@@ -110,10 +111,11 @@ class BaseClient:
         time.sleep(1.5) # wait for other clients to start
         for r in range(self.rounds):
             logger.log(f'Round {r}\n')
-            self.model.train()
+            self.model.train(plot=True)
             self.send_model()
             self.aggregate()
             self.current_round += 1
+        loan_defaulter.fig.savefig(os.path.join(os.getcwd(),'src','training','results',f"client{self.id}.png"))
         time.sleep(3) # wait for other clients to finish
         logger.log(f'Training complete\n')
         self.listener.shutdown()
@@ -141,7 +143,7 @@ class BaseClient:
                 for neighbor in self.neighbors:
                     if neighbor in waiting_for and self.received_msgs[self.current_round][neighbor] is not None:
                         waiting_for.remove(neighbor)
-            time.sleep(0.3)
+            time.sleep(0.1)
             if len(waiting_for) > 0:
                 logger.log(f'Waiting for {waiting_for}\n')
     def post_model(self, data, neighbor):
@@ -191,7 +193,7 @@ class BenignClient(BaseClient):
         data = {'id': self.id,'round': self.current_round, 'num_samples': self.model.num_samples, 'model_path': str(model_path)}
         for neighbor in self.neighbors:
             self.post_model(data, neighbor)
-            time.sleep(0.2)
+            #time.sleep(0.1)
 
 class MaliciousClient(BaseClient):
     def __init__(self, id_num: int):
@@ -232,17 +234,19 @@ class MaliciousClient(BaseClient):
         model_path = os.path.join(os.getcwd(),'src', 'training', \
                                     'models', 'clients', f'client_{self.id}.pt')
 
-        if self.attack_type == 'noiseinjection':
+        if self.attack_type == 'noise':
             attack_model = self.attacker.attack(self.model.state_dict)
-        elif self.attack_type=='innerproduct':
-            with self.received_msgs_lock:
-                models = [msg['model'] for msg in self.received_msgs[self.current_round].values()]
-            attack_model = self.attacker.attack(models)
+        # elif self.attack_type=='innerproduct':
+        #     with self.received_msgs_lock:
+        #         models = [msg['model'] for msg in self.received_msgs[self.current_round].values()]
+        #     models.append(self.model.state_dict)
+        #     attack_model = self.attacker.attack(models)
         torch.save(attack_model, model_path)
         data = {'id': self.id,'round': self.current_round, 'num_samples': self.model.num_samples, 'model_path': str(model_path)}
         logger.log(f'Sending poisoned model to neighbors for round {self.current_round}\n')
         for neighbor in self.benign_neighbors:
             self.post_model(data, neighbor)
+            #time.sleep(0.1)
             
   
 def is_malicious(id_num: int):
