@@ -2,9 +2,9 @@
 This file is the main entry point for the simulator. It sets up the server and runs the clients.
 '''
 from network import graph
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import torch
+# from fastapi import FastAPI
+# from fastapi.middleware.cors import CORSMiddleware
+# import torch
 import subprocess
 import os
 import random

@@ -1,0 +1,7 @@
+PyYAML
+torch
+pandas
+scikit-learn
+scikit-image
+matplotlib
+requests

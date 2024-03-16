@@ -34,7 +34,7 @@ def eval_global_model():
         return
     aggregated_model = FedAvg(DummyLogger()).aggregate(models)
     if experiment_params['model_name'] == 'loan_defaulter':
-        model = LoanDefaulter("/Users/sidb/Development/DFL-Secure-Aggregation/src/training/data/loan_data.csv", \
+        model = LoanDefaulter(experiment_params['data_path'], \
                                 num_samples=10000, node_hash=0, epochs=10, batch_size=100, logger=DummyLogger())
     model.model.load_state_dict(aggregated_model)
     model.evaluate()
