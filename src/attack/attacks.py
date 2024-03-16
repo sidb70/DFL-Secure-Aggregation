@@ -8,9 +8,9 @@ class Noise:
     Modifed from: https://github.com/enriquetomasmb/fedstellar/blob/main/fedstellar/attacks/aggregation.py
         under GPL 3.0 License
     '''
-    def __init__(self, attack_strength: float, logger: Logger):
+    def __init__(self, attack_args: dict, logger: Logger):
         self.logger=logger
-        self.attack_strength = attack_strength
+        self.attack_strength = attack_args['strength']
     def attack(self, model: OrderedDict):
     # Function to add random noise of various types to the model parameter.
         poisoned_model = OrderedDict()
@@ -38,8 +38,8 @@ class NoiseInjectionAttack():
     Modifed from: https://github.com/enriquetomasmb/fedstellar/blob/main/fedstellar/attacks/aggregation.py
         under GPL 3.0 License
     """
-    def __init__(self, strength=10000, logger: Logger=None):
-        self.strength = strength
+    def __init__(self, attack_args: dict, logger: Logger):
+        self.strength = attack_args['strength']
         self.logger = logger
 
     def attack(self, received_weights):
@@ -53,10 +53,11 @@ class NoiseInjectionAttack():
             self.logger.log(f"Layer noised: {k}")
             received_weights[k].data += torch.randn(received_weights[k].shape) * self.strength
         return received_weights
-def create_attacker(attack_type, attack_strength, logger):
+
+def create_attacker(attack_type, attack_args, logger):
     if attack_type == 'noise_injection':
-        return NoiseInjectionAttack(attack_strength, logger)
+        return NoiseInjectionAttack(attack_args, logger)
     elif attack_type == 'noise':
-        return Noise(attack_strength, logger)
+        return Noise(attack_args, logger)
     else:
         raise ValueError(f'Unknown attack type: {attack_type}')
