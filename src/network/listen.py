@@ -4,6 +4,7 @@ import threading
 import time
 from typing import Callable
 from logger import Logger
+from urllib.parse import unquote
 
 ## Global variable to store the callback and logger
 msg_callback = None
@@ -36,7 +37,8 @@ class MsgHandler(http.server.SimpleHTTPRequestHandler):
         content_length = int(self.headers['Content-Length']) # Gets the size of data
         post_data = self.rfile.read(content_length) # Gets the data itself
         try:
-            post_data = post_data.decode('utf-8') # Converts from bytes to string
+           
+            post_data = unquote(post_data) # decode
             post_data = post_data.split('&')
             post_data = [x.split('=') for x in post_data]
             post_data = {x[0]:x[1] for x in post_data} # convert to dictionary

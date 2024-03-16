@@ -84,6 +84,7 @@ class Client:
         self.received_msgs_lock  = threading.Lock() 
 
         listen.set_globals(self.recieve_model, self.logger) # set the callback for the listen module
+        time.sleep(1.5) # wait for other clients to start
     def load_model(self, log=False):
         """
         Load the model
@@ -106,7 +107,7 @@ class Client:
         Load the aggregator
         """
         aggregation = experiment_params['aggregation']
-        self.aggregator = strategies.create_aggregator(aggregation, self.logger)
+        self.aggregator = strategies.create_aggregator(aggregation, experiment_params, self.logger)
     def load_attacker(self, log=False):
         if self.am_malicious:
             self.attacker = attacks.create_attacker(attack_type=self.attack_type, attack_strength=self.attack_strength, logger=self.logger)
@@ -134,7 +135,7 @@ class Client:
         msg['num_samples'] = int(msg['num_samples'])
         if not self.is_synch and msg['round'] < self.current_round:
             return
-        model_path= os.path.join(os.getcwd(), 'src', 'training', 'models', 'clients', f'client_{msg["id"]}.pt')  
+        model_path= msg['model_path']
         msg['model'] = torch.load(model_path)
         with self.received_msgs_lock:
             if not self.is_synch and msg['round'] >= self.current_round:
@@ -149,19 +150,19 @@ class Client:
         # send model to neighbors
         if not os.path.exists(os.path.join('src', 'training', 'models', 'clients')):
             os.makedirs(os.path.join('src', 'training', 'models', 'clients'))
-        model_path = os.path.join(os.path.abspath(__file__).strip('client.py'), 'training', \
+        model_path = os.path.join(os.getcwd(),'src', 'training', \
                                     'models', 'clients', f'client_{self.id}.pt')
-        print('model_path', model_path)
+        #print('model_path', model_path)
 
         if not self.am_malicious:
             torch.save(self.model.state_dict, model_path)
         else:
             attack_model = self.attacker.attack(self.model.state_dict)
             torch.save(attack_model, model_path)
+        data = {'id': self.id,'round': self.current_round, 'num_samples': self.model.num_samples, 'model_path': str(model_path)}
         for neighbor in self.neighbors:
             neighbor_addr = self.topology[neighbor]['ip'] + ':' + str(self.topology[neighbor]['port'])
             url = f'http://{neighbor_addr}/'
-            data = {'id': self.id,'round': self.current_round, 'num_samples': self.model.num_samples}
             try:
                 response = requests.post(url, data=data)
                 if response.status_code != 200:
