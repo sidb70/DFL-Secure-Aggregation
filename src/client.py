@@ -108,6 +108,7 @@ class BaseClient:
     def train_fl(self):
         # listen on a separate thread
         self.listener.listen_for_models()
+        time.sleep(1.5) # wait for other clients to start
         for r in range(self.rounds):
             logger.log(f'Round {r}\n')
             # train model
@@ -185,7 +186,6 @@ class BenignClient(BaseClient):
         data = {'id': self.id,'round': self.current_round, 'num_samples': self.model.num_samples, 'model_path': str(model_path)}
         for neighbor in self.neighbors:
             self.post_model(data, neighbor)
-        #time.sleep(0.1)
     def aggregate(self):
         if self.is_synch:
             waiting_for = set(self.neighbors)
@@ -215,8 +215,7 @@ class MaliciousClient(BaseClient):
         if log:
             logger.log(f'Loaded attacker with type {self.attack_type} and args {attack_args}\n')
             logger.log(f'Benign neighbors: {self.benign_neighbors}\n')
-    def train_fl(self):
-        return super().train_fl()
+
     def send_model(self):
         if self.is_synch:
             waiting_for = set(self.benign_neighbors)
@@ -229,11 +228,16 @@ class MaliciousClient(BaseClient):
 
         if self.attack_type =='noise' or self.attack_type == 'noise_injection':
             attack_model = self.attacker.attack(self.model.state_dict)
+        elif self.attack_type=='inner_product':
+            with self.received_msgs_lock:
+                models = [msg['model'] for msg in self.received_msgs[self.current_round].values()]
+            attack_model = self.attacker.attack(models)
         torch.save(attack_model, model_path)
         data = {'id': self.id,'round': self.current_round, 'num_samples': self.model.num_samples, 'model_path': str(model_path)}
         for neighbor in self.benign_neighbors:
             self.post_model(data, neighbor)
-        #time.sleep(0.1)
+        
+
 
     def aggregate(self):
         pass
@@ -246,7 +250,6 @@ def main(args, logger):
         client = MaliciousClient(args.id, logger)
     else:
         client = BenignClient(args.id, logger)
-    time.sleep(1) # wait for other clients to start
     client.train_fl()
 
 if __name__ == '__main__':

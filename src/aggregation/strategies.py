@@ -39,7 +39,7 @@ class FedAvg(Aggregator):
     def __init__(self, logger, **kwargs):
         super().__init__(logger, **kwargs)
 
-    def aggregate(self, models: list):
+    def aggregate(self, models: list, log=True):
         """
         Weighted average of the models.
 
@@ -58,14 +58,15 @@ class FedAvg(Aggregator):
         accum = {layer: torch.zeros_like(param) for layer, param in models[-1][0].items()}
 
         # Add weighted models
-        self.logger.log(f"[FedAvg.aggregate] Aggregating models: num={len(models)}")
-        for model, weight in models:
+        if log:
+            self.logger.log(f"[FedAvg.aggregate] Aggregating models: num={len(models)}")
+        for model, num_samples in models:
             for layer in accum:
-                accum[layer] += model[layer] * weight
+                accum[layer] += model[layer] * (1/len(models)) # Normalize by the number of models
 
-        # Normalize Accum
-        for layer in accum:
-            accum[layer] /= total_samples
+        # Normalize by the number of samples
+        # for layer in accum:
+        #     accum[layer] /= total_samples
             
         # self.print_model_size(accum)
 
