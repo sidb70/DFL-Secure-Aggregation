@@ -13,6 +13,7 @@ class BaseModel:
         self.y_valid = None
         self.model = None
 
+        self.device = 'cuda' if torch.cuda.is_available else 'cpu'
     def train(self):
         raise NotImplementedError
     def evaluate(self):

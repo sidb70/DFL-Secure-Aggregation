@@ -36,7 +36,7 @@ class LoanDefaulter(BaseModel):
                 torch.nn.ReLU(),
                 torch.nn.Linear(50, 1),
                 torch.nn.Sigmoid()
-            )
+        ).to(self.device)
         self.model.apply(self.init_weights)
         self.state_dict = self.model.state_dict()
 
@@ -83,11 +83,11 @@ class LoanDefaulter(BaseModel):
         X_train, X_valid, y_train, y_valid = model_selection.train_test_split(X, y, test_size=0.2, random_state=self.node_hash)
     
             # convert data to tensors
-        X_train_tensor = torch.from_numpy(X_train).float()
-        y_train_tensor = torch.squeeze(torch.from_numpy(y_train.to_numpy()).float())
+        X_train_tensor = torch.from_numpy(X_train).float().to(self.device)
+        y_train_tensor = torch.squeeze(torch.from_numpy(y_train.to_numpy()).float()).to(self.device)
 
-        X_valid_tensor = torch.from_numpy(X_valid).float()
-        y_valid_tensor = torch.squeeze(torch.from_numpy(y_valid.to_numpy()).float())
+        X_valid_tensor = torch.from_numpy(X_valid).float().to(self.device)
+        y_valid_tensor = torch.squeeze(torch.from_numpy(y_valid.to_numpy()).float()).to(self.device)
         return X_train_tensor, X_valid_tensor, y_train_tensor, y_valid_tensor
     def train(self, plot=False):
         # define loss function and optimizer
