@@ -62,8 +62,10 @@ class FedAvg(Aggregator):
             self.logger.log(f"[FedAvg.aggregate] Aggregating models: num={len(models)}")
         for model, num_samples in models:
             for layer in accum:
-                accum[layer] += model[layer] * (1/len(models)) # Normalize by the number of models
-
+                accum[layer] += model[layer]
+        # normalize by number of clients
+        for layer in accum:
+            accum[layer] /= len(models)
         # Normalize by the number of samples
         # for layer in accum:
         #     accum[layer] /= total_samples
