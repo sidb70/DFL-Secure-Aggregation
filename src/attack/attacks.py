@@ -2,6 +2,7 @@ import torch
 from logger import Logger
 from skimage.util import random_noise
 from collections import OrderedDict
+from aggregation.strategies import FedAvg
 
 class Noise:
     '''
@@ -53,6 +54,48 @@ class NoiseInjectionAttack():
             self.logger.log(f"Layer noised: {k}")
             received_weights[k].data += torch.randn(received_weights[k].shape) * self.strength
         return received_weights
+class InnerProductAttack:
+    """
+    Function to perform inner product attack on the received weights.
+    
+    """
+    def __init__(self, attack_args: dict, logger: Logger):
+        self.defense = attack_args['defense']
+        self.epsilon = attack_args['epsilon']
+        self.logger = logger
+    def get_mean_model(self, models: list):
+        """
+        Get the mean of the models.
+        :param models: A list of tuples (model, num_samples) from benign clients.
+        :return: The mean model.
+        """
+        # Create a Zero Model
+        accum = {layer: torch.zeros_like(param) for layer, param in models[-1].items()}
+        
+        for model in models:
+            for layer, param in model.items():
+                accum[layer] += param/len(models)
+        return accum
+    def attack(self, models: list):
+        """
+        Perform inner product attack on the received weights.
+        :param models: A list of models from benign clients.
+        :return: A dictionary containing the attacked weights.
+        """
+        self.logger.log("[InnerProductAttack] Performing inner product attack")
+        # Get the mean of the models
+        if self.defense=='mean':
+            attack_model = self.get_mean_model(models)
+            # multiply by negative epsilon
+            for layer, param in attack_model.items():
+                attack_model[layer] = (-1*self.epsilon)*param
+            return attack_model
+        
+        else:
+            raise NotImplementedError(f"Defense {self.defense} not implemented")
+
+
+    
 
 def create_attacker(attack_type, attack_args, logger):
     if attack_type == 'noise_injection':
