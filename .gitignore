@@ -166,3 +166,4 @@ cython_debug/
 *.pt
 src/config/topology.json
 src/config/experiment.yaml
+*.DS_Store
