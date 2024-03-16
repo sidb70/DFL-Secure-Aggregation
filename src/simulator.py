@@ -16,8 +16,8 @@ import signal
 # seed
 random.seed(42)
 # ______________ Globals ______________
-toplogy = None
-server_port = 5999
+# toplogy = None
+# server_port = 5999
 # ______________ Setup ______________
 # app = FastAPI()
 # app.add_middleware(
@@ -55,8 +55,8 @@ def run_clients(num_clients):
     processes = []
     for i in range(num_clients):
         # run as separate process to avoid GIL
-        client_file = os.path.join('src','client.py')
-        process = subprocess.Popen(['python3', client_file, '--simulator', f'localhost:{server_port}', '--id', str(i)])
+        client_file = os.path.join(os.getcwd(),'src','client.py')
+        process = subprocess.Popen(['python3', client_file, '--id', str(i)])
         processes.append(process)
         print(f'Started client {i}')
     return processes
