@@ -12,30 +12,33 @@ import yaml
 import logging
 import eval
 import signal
+
+# seed
+random.seed(42)
 # ______________ Globals ______________
 toplogy = None
 server_port = 5999
 # ______________ Setup ______________
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # This allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # This allows all HTTP methods
-    allow_headers=["*"],  # This allows all headers
-)
+# app = FastAPI()
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],  # This allows all origins
+#     allow_credentials=True,
+#     allow_methods=["*"],  # This allows all HTTP methods
+#     allow_headers=["*"],  # This allows all headers
+# )
 
 # ______________ Routes ______________
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
+# @app.get("/")
+# def read_root():
+#     return {"Hello": "World"}
 
-@app.get("/topology")
-async def get_topology():
-    global topology
-    if topology is None:
-        return {"error": "topology not set"}
-    return topology.to_json()
+# @app.get("/topology")
+# async def get_topology():
+#     global topology
+#     if topology is None:
+#         return {"error": "topology not set"}
+#     return topology.to_json()
 
 
 # ______________ Simulator ______________
@@ -96,23 +99,25 @@ def run_simulation(params):
     edge_density = params['edge_density']
     malicious_proportion = params['malicious_proportion']
 
-    #### create network graph
-    topology = graph.create_graph()
-    print(f'Created topology with {num_nodes} nodes')
+    if not params['use_saved_topology']:
+        #### create network graph
+        topology = graph.create_graph()
+        print(f'Created topology with {num_nodes} nodes')
 
-    #### add users to network
-    # choose malicious nodes
-    malicous_nodes = random.sample(range(num_nodes), int(malicious_proportion*num_nodes))
-    print("Malicious nodes: ", malicous_nodes)
-    for i in range(num_nodes):
-        is_malicious = i in malicous_nodes
-        topology.add_user(i, f'localhost', 6000+i, malicious=is_malicious)
-    
-    #### add edges to graph
-    topology.make_connections(p=edge_density)
-    # save topology
-    topology.save(os.path.join(os.getcwd(), 'src','config','topology.json'))
- 
+        #### add users to network
+        # choose malicious nodes
+        malicous_nodes = random.sample(range(num_nodes), int(malicious_proportion*num_nodes))
+        print("Malicious nodes: ", malicous_nodes)
+        for i in range(num_nodes):
+            is_malicious = i in malicous_nodes
+            topology.add_user(i, f'localhost', 6000+i, malicious=is_malicious)
+        
+        #### add edges to graph
+        topology.make_connections(p=edge_density)
+        # save topology
+        topology.save(os.path.join(os.getcwd(), 'src','config','topology.json'))
+    else:
+        print('Using saved topology')
     # print(topology)
     # print()
     # print(topology.to_json())

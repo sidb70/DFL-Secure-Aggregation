@@ -3,7 +3,7 @@ import os
 from training.models.torch.loan_defaulter import (
     LoanDefaulter,
 )
-from aggregation import strategies
+from aggregation.strategies import FedAvg
 import yaml
 import json
 class DummyLogger:
@@ -32,8 +32,7 @@ def eval_global_model():
     if len(models) == 0:
         print("No non-malicious clients to evaluate")
         return
-    aggregation_strategy = experiment_params['aggregation']
-    aggregated_model = strategies.create_aggregator(aggregation_strategy,logger=DummyLogger()).aggregate(models)
+    aggregated_model = FedAvg(DummyLogger()).aggregate(models)
     if experiment_params['model_name'] == 'loan_defaulter':
         model = LoanDefaulter("/Users/sidb/Development/DFL-Secure-Aggregation/src/training/data/loan_data.csv", \
                                 num_samples=10000, node_hash=0, epochs=10, batch_size=100, logger=DummyLogger())

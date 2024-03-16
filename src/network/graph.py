@@ -1,5 +1,7 @@
 import random
 import json
+# seed
+random.seed(42)
 class UserGraph:
     def __init__(self):
         self.nodes = {}
