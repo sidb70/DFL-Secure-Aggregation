@@ -7,8 +7,7 @@ import torch
 import matplotlib.pyplot as plt
 from .Model import BaseModel
 from logging import Logger
-
-
+import copy
 
 losses = [[0,0]]
 plt.ion()
@@ -96,7 +95,7 @@ class LoanDefaulter(BaseModel):
 
         # train 1 epoch, in batches of 10
         
-        grads = {name: 0 for name, param in self.model.named_parameters()}
+        self.prev_model =copy.deepcopy(self.state_dict)
         for epoch in range(self.epochs):
             for i in range(0, len(self.X_train), self.batch_size):
                 X_batch = self.X_train[i:i+self.batch_size]
@@ -105,8 +104,6 @@ class LoanDefaulter(BaseModel):
                 loss = criterion(y_pred, y_batch)
                 optimizer.zero_grad()
                 loss.backward()
-                for name, param in self.model.named_parameters():
-                    grads[name] += param.grad
                 optimizer.step()
                 #self.logger.log(grads['0.bias'])
             #self.logger.log('Epoch {}, Loss: {}'.format(epoch, loss.item()))

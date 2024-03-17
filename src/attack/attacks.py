@@ -2,6 +2,20 @@ import torch
 from logger import Logger
 from skimage.util import random_noise
 from collections import OrderedDict
+import copy
+class SignFlip:
+    def __init__(self, attack_args: dict, logger: Logger):
+        self.logger=logger
+        # flipped model will go in opposite direction as the normally trained model
+        self.flipped_model = None
+    def attack(self, model: OrderedDict, prev_model: OrderedDict):
+        if not self.flipped_model:
+            self.flipped_model = copy.deepcopy(prev_model)
+        self.logger.log("[SignFlippingAttack]")
+        for layer in prev_model:
+            self.logger.log(f"[SignFlippingAttack] Attacking layer {layer}")
+            self.flipped_model[layer] += -1*(model[layer]-prev_model[layer])
+        return self.flipped_model
 
 class Noise():
     """
@@ -24,8 +38,10 @@ class Noise():
         lkeys = list(model.keys())
         for k in lkeys:
             self.logger.log(f"Layer noised: {k}")
+            # adding noise with mu =0, sigma=1 * strength
             model[k].data += torch.randn(model[k].shape).to('cuda' if torch.cuda.is_available() else 'cpu') \
-                * self.strength
+                * self.strength 
+            
         return model
 # class InnerProductAttack:
 #     """
@@ -79,5 +95,7 @@ def create_attacker(attack_type, attack_args, logger):
         return Noise(attack_args, logger)
     # elif attack_type == 'innerproduct':
     #     return InnerProductAttack(attack_args, logger)
+    elif attack_type=='signflip':
+        return SignFlip(attack_args, logger)
     else:
         raise ValueError(f'Unknown attack type: {attack_type}')
