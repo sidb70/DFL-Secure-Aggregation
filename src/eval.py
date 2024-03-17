@@ -8,7 +8,8 @@ import yaml
 import json
 class DummyLogger:
     def log(self, msg):
-        print(msg)
+        #print(msg)
+        return
 
 
 def eval_global_model():
@@ -24,18 +25,20 @@ def eval_global_model():
         topology_json = json.load(f)
     topology = {int(node_id):val for node_id,val in topology_json.items()}
     num_clients = experiment_params['nodes']
-    models =[]
-    for i in range(num_clients):
-        if not topology[i]['malicious']:
-            models.append((torch.load(os.path.join('src','training','models','clients',f'client_{i}.pt')), 
-                           experiment_params['num_samples']))
-    if len(models) == 0:
-        print("No non-malicious clients to evaluate")
-        return
-    aggregated_model = FedAvg(DummyLogger()).aggregate(models)
+
+    accuracies = []
     if experiment_params['model_name'] == 'loan_defaulter':
-        model = LoanDefaulter(experiment_params['data_path'], \
-                                num_samples=10000, node_hash=0, epochs=10, batch_size=100, logger=DummyLogger())
-    model.model.load_state_dict(aggregated_model)
-    model.evaluate()
+        eval_model = LoanDefaulter(experiment_params['data_path'], \
+                        num_samples=100, node_hash=0, epochs=1, batch_size=10, logger=DummyLogger())
+    base_dir=os.path.join('src','training','models','clients')
+    for i in range(num_clients):
+        if topology[i]['malicious']:
+            continue
+        benign_model = torch.load(os.path.join(base_dir,f'client_{i}.pt')) 
+        eval_model.load_state_dict(benign_model)
+        accuracies.append(eval_model.evaluate())
     
+    print(f"Average global acc. of {len(accuracies)} benign clients:\n\t", 
+          sum(accuracies)/len(accuracies))
+if __name__=='__main__':
+    eval_global_model()

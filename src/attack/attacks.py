@@ -13,7 +13,7 @@ class SignFlip:
             self.flipped_model = copy.deepcopy(prev_model)
         self.logger.log("[SignFlippingAttack]")
         for layer in prev_model:
-            self.logger.log(f"[SignFlippingAttack] Attacking layer {layer}")
+            self.logger.log(f"[SignFlippingAttack] Flipping layer {layer}")
             self.flipped_model[layer] += -1*(model[layer]-prev_model[layer])
         return self.flipped_model
 

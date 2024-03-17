@@ -136,5 +136,7 @@ class LoanDefaulter(BaseModel):
         y_pred = self.model(self.X_valid).squeeze()
         y_pred = torch.round(y_pred)
         correct = torch.sum(y_pred == self.y_valid)
-        self.logger.log('Accuracy: {}'.format(correct.item()/len(self.y_valid)))
+        acc = correct.item()/len(self.y_valid)
+        self.logger.log('Accuracy: {}'.format(acc))
+        return acc
         
