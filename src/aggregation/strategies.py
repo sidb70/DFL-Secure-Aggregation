@@ -4,6 +4,9 @@ Modified under the GNU General Public License v3.0
 '''
 import torch
 import numpy as np
+import copy
+
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def create_aggregator(aggregator_type, experiment_params, logger):
     """
@@ -108,7 +111,7 @@ class Median(Aggregator):
         else:
             # even number, return the mean of median two numbers
             # sort the tensor
-            arr_weights = np.asarray(weights) 
+            arr_weights = np.asarray(weights.cpu()) 
             nobs = arr_weights.shape[0]
             start = int(nobs / 2) - 1
             end = int(nobs / 2) + 1
@@ -116,7 +119,7 @@ class Median(Aggregator):
             sl = [slice(None)] * atmp.ndim
             sl[0] = slice(start, end)
             arr_median = np.mean(atmp[tuple(sl)], axis=0)
-            median = torch.tensor(arr_median)
+            median = torch.tensor(arr_median,device=device)
         return median
 
     def aggregate(self, models):
@@ -203,9 +206,9 @@ class Krum(Aggregator):
         total_samples = sum([y for _, y in models])
 
         # Create a Zero Model
-        accum = (models[-1][0]).copy()
+        accum = copy.deepcopy(models[-1][0])
         for layer in accum:
-            accum[layer] = torch.zeros_like(accum[layer])
+            accum[layer] = torch.zeros_like(accum[layer]).cpu()
 
         # Add weighteds models
         self.logger.log("[Krum.aggregate] Aggregating models: num={}".format(len(models)))
@@ -227,11 +230,12 @@ class Krum(Aggregator):
                     distance = 0
                 else:
                     for layer in m1:
-                        l1 = m1[layer]
+                        l1 = m1[layer].detach().clone().cpu()
                         # l1 = l1.view(len(l1), 1)
 
-                        l2 = m2[layer]
+                        l2 = m2[layer].detach().clone().cpu()
                         # l2 = l2.view(len(l2), 1)
+                        
                         distance += np.linalg.norm(l1 - l2)
                 distance_list[i] += distance
 
@@ -239,11 +243,14 @@ class Krum(Aggregator):
                 min_distance_sum = distance_list[i]
                 min_index = i
 
+        
         # Assign the model with min distance with others as the aggregated model
         m, _ = models[min_index]
         for layer in m:
+            if torch.cuda.is_available():
+                accum[layer]=accum[layer].to(device)
             accum[layer] = accum[layer] + m[layer]
-
+            
         return accum
 
 
@@ -284,21 +291,39 @@ class TrimmedMean(Aggregator):
 
         else:
             # remove the largest and smallest β items
-            arr_weights = np.asarray(weights)
+            arr_weights = torch.asarray(weights).cpu().numpy()
             # sort the tensor
             arr_weights = np.sort(arr_weights, axis=0)
             nobs = arr_weights.shape[0] # number of observations
             start = self.beta
             end = nobs - self.beta
             atmp = np.partition(arr_weights, (start, end - 1), 0)
+            # smallest = torch.topk(arr_weights, k=(self.beta), largest=False, dim=0)
+            # largest = torch.topk(arr_weights, k=self.beta, largest=True, dim=0)
+
+            # mask = torch.ones_like(arr_weights, dtype=torch.bool)
+            # self.logger.log("mask before" + str(mask) )
+            # # mask the smallest and largest elements
+            # for i in range(self.beta):  
+            #     mask = mask & (arr_weights != smallest.values[i])
+            #     mask = mask & (arr_weights != largest.values[i])
+            # self.logger.log("mask after" + str(mask) )
+
+            # trimmed = arr_weights[mask]
+            # self.logger.log(str(trimmed))
+
+
             sl = [slice(None)] * atmp.ndim
             sl[0] = slice(start, end)
             # print num of remaining weights after trimming
             #print(len(atmp[tuple(sl)]))
             #print(atmp[tuple(sl)])
             arr_median = np.mean(atmp[tuple(sl)], axis=0)
-            res = torch.tensor(arr_median)
-
+            res = torch.tensor(arr_median).to(device)
+            # take mean of each column
+            #res = torch.mean(trimmed, 0)
+            #self.logger.log('res' + str(res))
+            #print(res)
         # get the mean of the remaining weights
         return res
 
@@ -358,6 +383,8 @@ class TrimmedMean(Aggregator):
 
                 # get the weight list [w1j,w2j,··· ,wmj], where wij is the jth parameter of the ith local model
                 trimmedmean = self.get_trimmedmean(models_layer_weight_flatten)
+                #print(l_shape)
+                #print(trimmedmean.shape)
                 accum[layer] = trimmedmean.view(l_shape)
 
         return accum
