@@ -1,7 +1,9 @@
 import random
 import json
+import bisect
 # seed
 random.seed(42)
+
 class UserGraph:
     def __init__(self):
         self.nodes = {}
@@ -10,7 +12,8 @@ class UserGraph:
         if user_num in self.nodes:
             return
         self.nodes[user_num] = {'ip': ip, 'port': port, 'malicious': malicious}
-        self.edges[user_num] = set()
+        if user_num not in self.edges:
+            self.edges[user_num] = set()
 
     def make_connections(self, p=1.0, directed=False):
         for user1 in self.nodes:
@@ -28,6 +31,10 @@ class UserGraph:
     def add_edge(self, user1, user2, directed=False):
         if user1 in self.edges and user2 in self.edges[user1]:
             return
+        if user1 not in self.edges:
+            self.edges[user1] = set()
+        if user2 not in self.edges:
+            self.edges[user2] = set()
         self.edges[user1].add(user2)
         if not directed:
             self.edges[user2].add(user1)
@@ -41,6 +48,40 @@ class UserGraph:
         if user in self.edges:
             return self.edges[user]
         return set()
+
+    def create_random_graph(self, num_nodes, edge_density, malicious_nodes):
+        for i in range(num_nodes):
+            is_malicious = i in malicious_nodes
+            self.add_user(i, f'localhost', 6000+i, malicious=is_malicious)
+        self.make_connections(p=edge_density)
+    def create_scale_free_graph(self, num_nodes, m0, m, malicious_nodes):
+        '''
+        create a scale free graph using the Barabasi-Albert model
+        num_nodes: number of nodes in the graph
+        m0: number of initial nodes
+        m: number of edges to attach from each new node to existing nodes
+        '''
+        for i in range(m0):
+            is_malicious = i in malicious_nodes
+            self.add_user(i, f'localhost', 6000+i, malicious=is_malicious)
+        self.make_connections(p=1.0)
+        for i in range(m0, num_nodes):
+            # choose m nodes to connect to
+            choices = [[node]*self.user_degree(node) for node in self.nodes]
+            choices = [item for sublist in choices for item in sublist]
+
+            is_malicious = i in malicious_nodes
+            self.add_user(i, f'localhost', 6000+i, malicious=i in malicious_nodes)
+
+            while self.user_degree(i) < m: # choose m neighbors
+                neighbor = random.choice(choices)
+                if neighbor not in self.user_edges(i):
+                    self.add_edge(i, neighbor)
+
+    def user_degree(self, user):
+        return len(self.edges[user])
+    def user_edges(self, user):
+        return self.edges[user]
     def to_dict(self):
         graph_dict = {}
         for user in self.nodes.keys():
@@ -54,6 +95,14 @@ class UserGraph:
     def save(self, filename):
         with open(filename, 'w') as f:
             json.dump(self.to_dict(), f)
+    def load(self, filename):
+        with open(filename, 'r') as f:
+            graph_dict = json.load(f)
+        for user, data in graph_dict.items():
+            self.add_user(user, data['ip'], data['port'], data['malicious'])
+            for edge in data['edges']:
+                self.add_edge(user, edge)
+
     def __iter__(self):
         return iter(self.nodes)
     

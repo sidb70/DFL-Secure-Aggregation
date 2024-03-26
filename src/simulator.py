@@ -96,24 +96,26 @@ def run_simulation(params):
     global topology
     ### get args
     num_nodes = params['nodes']
-    edge_density = params['edge_density']
     malicious_proportion = params['malicious_proportion']
 
     if not params['use_saved_topology']:
         #### create network graph
         topology = graph.create_graph()
         print(f'Created topology with {num_nodes} nodes')
-
-        #### add users to network
-        # choose malicious nodes
         malicous_nodes = random.sample(range(num_nodes), int(malicious_proportion*num_nodes))
         print("Malicious nodes: ", malicous_nodes)
-        for i in range(num_nodes):
-            is_malicious = i in malicous_nodes
-            topology.add_user(i, f'localhost', 6000+i, malicious=is_malicious)
-        
-        #### add edges to graph
-        topology.make_connections(p=edge_density)
+        #### add users to network
+        if experiment_params['topology']=='random':
+            edge_density = params['edge_density']
+            topology.create_random_graph(num_nodes, edge_density, malicous_nodes)
+        elif experiment_params['topology']=='scale-free':
+            m0=experiment_params['m0']
+            m=experiment_params['m']
+            topology.create_scale_free_graph(num_nodes, m0, m, malicous_nodes)
+        else:
+            raise ValueError('Invalid topology: must be random, small-world, or scale-free')
+
+
         # save topology
         topology.save(os.path.join(os.getcwd(), 'src','config','topology.json'))
     else:
