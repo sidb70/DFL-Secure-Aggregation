@@ -16,6 +16,11 @@ class UserGraph:
             self.edges[user_num] = set()
 
     def make_connections(self, p=1.0, directed=False):
+        '''
+        Make connections between users with probability p
+        :param p: probability of connection
+        :param directed: whether the graph is directed
+        '''
         for user1 in self.nodes:
             for user2 in self.nodes:
                 if user1 == user2:
@@ -29,6 +34,12 @@ class UserGraph:
                     if not directed:
                         self.remove_edge(user2, user1, directed=directed)
     def add_edge(self, user1, user2, directed=False):
+        '''
+        Add an edge between two users
+        :param user1: user 1
+        :param user2: user 2
+        :param directed: whether the graph is directed
+        '''
         if user1 in self.edges and user2 in self.edges[user1]:
             return
         if user1 not in self.edges:
@@ -39,17 +50,33 @@ class UserGraph:
         if not directed:
             self.edges[user2].add(user1)
     def remove_edge(self, user1, user2, directed=False):
+        '''
+        Remove an edge between two users
+        :param user1: user 1
+        :param user2: user 2
+        :param directed: whether the graph is directed
+        '''
         if user1 in self.edges and user2 in self.edges[user1]:
             self.edges[user1].remove(user2)
         if not directed:
             if user2 in self.edges and user1 in self.edges[user2]:
                 self.edges[user2].remove(user1)
     def get_neighbors(self, user):
+        '''
+        Get the neighbors of a user
+        :param user: user
+        :return: set of neighbors
+        '''
         if user in self.edges:
             return self.edges[user]
         return set()
 
     def create_random_graph(self, num_nodes, edge_density, malicious_nodes):
+        '''
+        Create a random graph
+        num_nodes: number of nodes in the graph
+        edge_density: probability of connection between nodes
+        '''
         for i in range(num_nodes):
             is_malicious = i in malicious_nodes
             self.add_user(i, f'localhost', 6000+i, malicious=is_malicious)
@@ -79,10 +106,24 @@ class UserGraph:
                     self.add_edge(i, neighbor)
 
     def user_degree(self, user):
+        '''
+        Get the degree of a user
+        :param user: user
+        :return: degree of the user
+        '''
         return len(self.edges[user])
     def user_edges(self, user):
+        ''' 
+        Get the edges of a user
+        :param user: user
+        :return: set of edges
+        '''
         return self.edges[user]
     def to_dict(self):
+        ''' 
+        Convert the graph to a dictionary
+        :return: dictionary representation of the graph
+        '''
         graph_dict = {}
         for user in self.nodes.keys():
             graph_dict[user] = {
@@ -93,9 +134,17 @@ class UserGraph:
             }
         return graph_dict
     def save(self, filename):
+        '''
+        Save the graph to a file
+        :param filename: name of the file
+        '''
         with open(filename, 'w') as f:
             json.dump(self.to_dict(), f)
     def load(self, filename):
+        '''
+        Load the graph from a file into this graph object
+        :param filename: name of the file
+        '''
         with open(filename, 'r') as f:
             graph_dict = json.load(f)
         for user, data in graph_dict.items():
