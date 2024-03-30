@@ -56,7 +56,7 @@ def run_clients(num_clients):
     for i in range(num_clients):
         # run as separate process to avoid GIL
         client_file = os.path.join(os.getcwd(),'src','client.py')
-        process = subprocess.Popen(['python3', client_file, '--id', str(i)])
+        process = subprocess.Popen(['python', client_file, '--id', str(i)])
         processes.append(process)
         print(f'Started client {i}')
     return processes
