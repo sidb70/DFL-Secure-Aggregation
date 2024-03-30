@@ -74,10 +74,11 @@ class BaseClient:
         logger.log(f'My info: {my_info}\n')
         logger.log(f'My neighbors: {self.neighbors}\n')
 
-        if not os.path.exists(os.path.join('src', 'training', 'models', 'clients')):
-            os.makedirs(os.path.join('src', 'training', 'models', 'clients'))
-        self.model_path = os.path.join(os.getcwd(),'src', 'training', \
-                                    'models', 'clients', f'client_{self.id}.pt')
+        
+        self.models_base_dir = os.path.join(os.getcwd(),'src', 'training', \
+                                    'models', 'clients')
+        if not os.path.exists(self.models_base_dir):
+            os.makedirs(self.models_base_dir)
         
         self.load_aggregator()
         self.load_model()
@@ -191,10 +192,13 @@ class BenignClient(BaseClient):
         if not os.path.exists(os.path.join('src', 'training', 'models', 'clients')):
             os.makedirs(os.path.join('src', 'training', 'models', 'clients'))
         #print('model_path', model_path)
-        torch.save(self.model.state_dict, self.model_path)
+        save_path = os.path.join(self.models_base_dir, f'round{self.current_round}', f'client_{self.id}.pt')
+        if not os.path.exists(os.path.join(self.models_base_dir, f'round{self.current_round}')):
+            os.makedirs(os.path.join(self.models_base_dir, f'round{self.current_round}'))
+        torch.save(self.model.state_dict, save_path)
         data = {'id': self.id,'round': self.current_round,
                 'num_samples': self.model.num_samples, 
-                'model_path': str(self.model_path)}
+                'model_path': str(save_path)}
         for neighbor in self.neighbors:
             self.post_model(data, neighbor)
             #time.sleep(0.1)
@@ -261,10 +265,11 @@ class MaliciousClient(BaseClient):
         #         models = [msg['model'] for msg in self.received_msgs[self.current_round].values()]
         #     models.append(self.model.state_dict)
         #     attack_model = self.attacker.attack(models)
-        torch.save(attack_model, self.model_path)
+        save_path = os.path.join(self.models_base_dir, f'round{self.current_round}', f'client_{self.id}.pt')
+        torch.save(attack_model, save_path)
         data = {'id': self.id,'round': self.current_round, 
                 'num_samples': self.model.num_samples, 
-                'model_path': str(self.model_path)}
+                'model_path': str(save_path)}
         logger.log(f'Sending poisoned model to neighbors for round {self.current_round}\n')
         for neighbor in self.benign_neighbors:
             self.post_model(data, neighbor)

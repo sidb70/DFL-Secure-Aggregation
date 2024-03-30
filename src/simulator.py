@@ -129,9 +129,9 @@ def run_simulation(params):
 
     # delete models
         # clear model directory
-    model_dir = os.path.join('src','training','models','clients')
-    for file in os.listdir(model_dir):
-        os.remove(os.path.join(model_dir, file))
+    # model_dir = os.path.join('src','training','models','clients')
+    # for file in os.listdir(model_dir):
+    #     os.remove(os.path.join(model_dir, file))
     #
     # uvicorn.run(app, host="localhost", port=server_port)
 

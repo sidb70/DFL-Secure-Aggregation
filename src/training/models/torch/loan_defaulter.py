@@ -22,10 +22,13 @@ ax.legend(['Train Loss', 'Validation Loss'])
 
 
 class LoanDefaulter(BaseModel):
-    def __init__(self, data_path: str, num_samples: int, node_hash: int, epochs: int, batch_size: int, logger: Logger):
-        super().__init__(data_path, num_samples, node_hash, epochs, batch_size)
+    def __init__(self, data_path: str, num_samples: int, node_hash: int, epochs: int, batch_size: int, logger: Logger, test_size: float = 0.2):
+        super().__init__(data_path, num_samples, node_hash, epochs, batch_size, test_size)
         self.logger = logger
         self.data = self.get_loan_defaulter_data(data_path)
+        if test_size==1:
+            self.X_train = self.data
+            self.X_valid = self.data
         self.X_train, self.X_valid, self.y_train, self.y_valid = self.train_test_split()
         self.logger.log(f"X_train shape {self.X_train.shape[1]}")
         self.model = torch.nn.Sequential(
@@ -42,7 +45,8 @@ class LoanDefaulter(BaseModel):
 
     def get_loan_defaulter_data(self,data_file: str):
         all_data = pd.read_csv(data_file)
-        
+        if self.num_samples==-1:
+            return all_data
         return all_data[self.node_hash*self.num_samples:(self.node_hash+1)*self.num_samples]
 
     def process_data(self, data):
@@ -79,7 +83,7 @@ class LoanDefaulter(BaseModel):
 
         y = mergeddf_sample['TARGET']
 
-        X_train, X_valid, y_train, y_valid = model_selection.train_test_split(X, y, test_size=0.2, random_state=self.node_hash)
+        X_train, X_valid, y_train, y_valid = model_selection.train_test_split(X, y, test_size=self.test_size, random_state=self.node_hash)
     
             # convert data to tensors
         X_train_tensor = torch.from_numpy(X_train).float().to(self.device)

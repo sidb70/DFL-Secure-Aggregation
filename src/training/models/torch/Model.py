@@ -1,11 +1,12 @@
 import torch
 class BaseModel:
-    def __init__(self, data_file: str, num_samples: int, node_hash: int, epochs: int, batch_size: int,):
+    def __init__(self, data_file: str, num_samples: int, node_hash: int, epochs: int, batch_size: int, test_size: float):
         self.data_file = data_file
         self.num_samples = num_samples
         self.node_hash = node_hash
         self.epochs = epochs
         self.batch_size = batch_size
+        self.test_size = test_size
         self.data = None
         self.X_train = None
         self.X_valid = None
