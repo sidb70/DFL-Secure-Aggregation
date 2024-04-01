@@ -1,61 +1,89 @@
+
+
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras import layers, Sequential
+import logging
+import numpy as np
 
-(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
 
-x_train, x_test = x_train / 255.0, x_test / 255.0
+class DigitClassifier:
+    def __init__(self, epochs: int, batch_size: int, num_samples: int, node_hash: int, logger: logging.Logger):
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.num_samples = num_samples
+        self.node_hash = node_hash
+        self.logger = logger
+        self.losses = {'train': [], 'validation': []}
+        self.load_data()
+        self.build_model()
 
-x_train = x_train[..., tf.newaxis]
-x_test = x_test[..., tf.newaxis]
+    def load_data(self):
+        (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
 
-train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(10000).batch(128)
-val_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(128)
+        np.random.seed(self.node_hash)
+        permutation = np.random.permutation(x_train.shape[0])
+        x_train, y_train = x_train[permutation], y_train[permutation]
 
-AUTOTUNE = tf.data.AUTOTUNE
-train_ds = train_ds.cache().prefetch(buffer_size=AUTOTUNE)
-val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
+        if self.num_samples > 0:
+            x_train, y_train = x_train[:self.num_samples], y_train[:self.num_samples]
 
-model = Sequential([
-  layers.Rescaling(1./255, input_shape=(28, 28, 1)),
-  layers.Conv2D(16, 3, padding='same', activation='relu'),
-  layers.MaxPooling2D(),
-  layers.Conv2D(32, 3, padding='same', activation='relu'),
-  layers.MaxPooling2D(),
-  layers.Conv2D(64, 3, padding='same', activation='relu'),
-  layers.MaxPooling2D(),
-  layers.Flatten(),
-  layers.Dense(128, activation='relu'),
-  layers.Dense(10) # 10 classes for the digits 0-9
-])
+        x_train, x_test = x_train / 255.0, x_test / 255.0
+        x_train = x_train[..., tf.newaxis]
+        x_test = x_test[..., tf.newaxis]
 
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
+        self.train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(10000,
+                                                                                       seed=self.node_hash).batch(
+            self.batch_size)
+        self.val_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(self.batch_size)
 
-epochs = 5
-history = model.fit(
-  train_ds,
-  validation_data=val_ds,
-  epochs=epochs
-)
+        AUTOTUNE = tf.data.AUTOTUNE
+        self.train_ds = self.train_ds.cache().prefetch(buffer_size=AUTOTUNE)
+        self.val_ds = self.val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
-# acc = history.history['accuracy']
-# val_acc = history.history['val_accuracy']
-# loss = history.history['loss']
-# val_loss = history.history['val_loss']
-# epochs_range = range(epochs)
+    def build_model(self):
+        self.model = Sequential([
+            layers.Rescaling(1. / 255, input_shape=(28, 28, 1)),
+            layers.Conv2D(16, 3, padding='same', activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Conv2D(32, 3, padding='same', activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Conv2D(64, 3, padding='same', activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Flatten(),
+            layers.Dense(128, activation='relu'),
+            layers.Dense(10)
+        ])
 
-# plt.figure(figsize=(8, 8))
-# plt.subplot(1, 2, 1)
-# plt.plot(epochs_range, acc, label='Training Accuracy')
-# plt.plot(epochs_range, val_acc, label='Validation Accuracy')
-# plt.legend(loc='lower right')
-# plt.title('Training and Validation Accuracy')
+        self.model.compile(optimizer='adam',
+                           loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                           metrics=['accuracy'])
 
-# plt.subplot(1, 2, 2)
-# plt.plot(epochs_range, loss, label='Training Loss')
-# plt.plot(epochs_range, val_loss, label='Validation Loss')
-# plt.legend(loc='upper right')
-# plt.title('Training and Validation Loss')
-# plt.show()
+    def train(self):
+        history = self.model.fit(
+            self.train_ds,
+            validation_data=self.val_ds,
+            epochs=self.epochs
+        )
+
+        self.losses['train'] = history.history['loss']
+        self.losses['validation'] = history.history['val_loss']
+
+        self.logger.info('Training complete')
+
+    def plot_losses(self):
+        epochs_range = range(self.epochs)
+
+        plt.figure(figsize=(8, 8))
+        plt.subplot(1, 2, 1)
+        plt.plot(epochs_range, self.losses['train'], label='Training Loss')
+        plt.plot(epochs_range, self.losses['validation'], label='Validation Loss')
+        plt.legend(loc='upper right')
+        plt.title('Training and Validation Loss')
+        plt.show()
+
+
+
+classifier = DigitClassifier(epochs=5, batch_size=128, num_samples=1000, node_hash=42, logger=logger)
+classifier.train()
+classifier.plot_losses()
