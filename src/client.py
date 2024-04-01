@@ -10,6 +10,7 @@ import threading
 from network import listen
 from training.models.torch import loan_defaulter
 from training.models.torch.loan_defaulter import LoanDefaulter
+from training.models.torch.MNIST_model import DigitClassifier
 import torch
 from aggregation import strategies
 from attack import attacks
@@ -102,7 +103,9 @@ class BaseClient:
 
         modelname = experiment_params['model_name']
         if modelname == 'loan_defaulter':
-                self.model = LoanDefaulter(data_path, num_samples, self.id, epochs, batch_size, logger)
+            self.model = LoanDefaulter(data_path, num_samples, self.id, epochs, batch_size, logger, evaluating=False)
+        elif modelname == 'digit_classifier':
+            self.model = DigitClassifier(epochs, batch_size, num_samples, self.id, logger, evaluating=False)
         else:
             raise ValueError(f'Unknown model name: {modelname}')
         logger.log(f'Loaded model {modelname}\n')
@@ -112,7 +115,7 @@ class BaseClient:
         time.sleep(1.5) # wait for other clients to start
         for r in range(self.rounds):
             logger.log(f'Round {r}\n')
-            self.model.train(plot=True)
+            self.model.train()
             self.send_model()
             self.aggregate()
             self.current_round += 1

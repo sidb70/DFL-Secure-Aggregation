@@ -22,17 +22,16 @@ ax.legend(['Train Loss', 'Validation Loss'])
 
 
 class LoanDefaulter(BaseModel):
-    def __init__(self, data_path: str, num_samples: int, node_hash: int, epochs: int, batch_size: int, logger: Logger, test_size: float = 0.2):
-        super().__init__(data_path, num_samples, node_hash, epochs, batch_size, test_size)
+    def __init__(self, data_path: str, num_samples: int, node_hash: int, epochs: int, batch_size: int, logger: Logger, evaluating=False):
+        super().__init__(num_samples, node_hash, epochs, batch_size, evaluating=evaluating)
         self.logger = logger
         self.data = self.get_loan_defaulter_data(data_path)
-        if test_size==1:
-            self.X_train = self.data
-            self.X_valid = self.data
         self.X_train, self.X_valid, self.y_train, self.y_valid = self.train_test_split()
-        self.logger.log(f"X_train shape {self.X_train.shape[1]}")
+        if self.X_train:
+            self.logger.log(f"X_train shape {self.X_train.shape[1]}")
+        self.logger.log("X valid shape {}".format(self.X_valid.shape))
         self.model = torch.nn.Sequential(
-                torch.nn.Linear(self.X_train.shape[1], 100),
+                torch.nn.Linear(self.X_valid.shape[1], 100),
                 torch.nn.ReLU(),
                 torch.nn.Linear(100, 50),
                 torch.nn.ReLU(),
@@ -42,10 +41,13 @@ class LoanDefaulter(BaseModel):
         self.model.apply(self.init_weights)
         self.state_dict = self.model.state_dict()
 
-
+    def init_weights(self, model):  
+        if isinstance(model, torch.nn.Linear):
+            torch.nn.init.xavier_uniform_(model.weight)
+            model.bias.data.fill_(0.01)
     def get_loan_defaulter_data(self,data_file: str):
         all_data = pd.read_csv(data_file)
-        if self.num_samples==-1:
+        if self.evaluating:
             return all_data
         return all_data[self.node_hash*self.num_samples:(self.node_hash+1)*self.num_samples]
 
@@ -82,12 +84,17 @@ class LoanDefaulter(BaseModel):
         self.logger.log(f"X shape {X.shape[1]}")
 
         y = mergeddf_sample['TARGET']
-
-        X_train, X_valid, y_train, y_valid = model_selection.train_test_split(X, y, test_size=self.test_size, random_state=self.node_hash)
+        if self.evaluating==1:
+            X_train_tensor = None
+            y_train_tensor = None
+            X_valid = X
+            y_valid = y
+        else:
+            X_train, X_valid, y_train, y_valid = model_selection.train_test_split(X, y, test_size=self.test_size, random_state=self.node_hash)
     
-            # convert data to tensors
-        X_train_tensor = torch.from_numpy(X_train).float().to(self.device)
-        y_train_tensor = torch.squeeze(torch.from_numpy(y_train.to_numpy()).float()).to(self.device)
+                # convert data to tensors
+            X_train_tensor = torch.from_numpy(X_train).float().to(self.device)
+            y_train_tensor = torch.squeeze(torch.from_numpy(y_train.to_numpy()).float()).to(self.device)
 
         X_valid_tensor = torch.from_numpy(X_valid).float().to(self.device)
         y_valid_tensor = torch.squeeze(torch.from_numpy(y_valid.to_numpy()).float()).to(self.device)

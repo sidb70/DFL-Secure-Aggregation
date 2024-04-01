@@ -1,12 +1,11 @@
 import torch
 class BaseModel:
-    def __init__(self, data_file: str, num_samples: int, node_hash: int, epochs: int, batch_size: int, test_size: float):
-        self.data_file = data_file
+    def __init__(self, num_samples: int, node_hash: int, epochs: int, batch_size: int, evaluating=False):
         self.num_samples = num_samples
         self.node_hash = node_hash
         self.epochs = epochs
         self.batch_size = batch_size
-        self.test_size = test_size
+        self.evaluating = evaluating
         self.data = None
         self.X_train = None
         self.X_valid = None
@@ -20,7 +19,6 @@ class BaseModel:
         raise NotImplementedError
     def evaluate(self):
         raise NotImplementedError
-    def init_weights(self, model):  
-        if isinstance(model, torch.nn.Linear):
-            torch.nn.init.xavier_uniform_(model.weight)
-            model.bias.data.fill_(0.01)
+    def load_state_dict(self, state_dict):
+        self.model.load_state_dict(state_dict)
+        self.state_dict = self.model.state_dict()

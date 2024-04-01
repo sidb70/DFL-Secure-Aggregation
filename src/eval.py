@@ -1,8 +1,7 @@
 import torch
 import os
-from training.models.torch.loan_defaulter import (
-    LoanDefaulter,
-)
+from training.models.torch.loan_defaulter import LoanDefaulter
+from training.models.torch.MNIST_model import DigitClassifier
 from aggregation.strategies import FedAvg
 import yaml
 import json
@@ -31,8 +30,12 @@ def eval_global_model():
     accuracies_by_round = {round_num: [] for round_num in range(experiment_params['rounds'])}
     if experiment_params['model_name'] == 'loan_defaulter':
         eval_model = LoanDefaulter(experiment_params['data_path'], \
-                        num_samples=-1, node_hash=0, epochs=1, batch_size=10, test_size=0.99, 
+                        num_samples=-1, node_hash=0, epochs=1, batch_size=10, evaluating=True, 
                         logger=DummyLogger())
+    elif experiment_params['model_name'] == 'digit_classifier':
+        eval_model = DigitClassifier(epochs=20, batch_size=128, num_samples=10, 
+                                 node_hash=42,logger=DummyLogger(), 
+                                 evaluating=True)
     base_dir=os.path.join('src','training','models','clients')
     for r in range(experiment_params['rounds']):
         accuracies = []
@@ -51,7 +54,9 @@ def eval_global_model():
     plt.ylabel('Accuracy')
     plt.title('Accuracy by Round')
     plt.show()
-
+    save_dir = os.path.join('src','training','results')
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
     plt.savefig(os.path.join('src','training','results','accuracy_by_round.png'))
     
     
