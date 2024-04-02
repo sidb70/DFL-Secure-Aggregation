@@ -162,6 +162,8 @@ class DigitClassifier(BaseModel):
         self.model.eval()
         correct = 0
         total = 0
+        losses = []
+        criterion = nn.CrossEntropyLoss()
         with torch.no_grad():
             for data in self.X_valid:
                 images, labels = data
@@ -170,9 +172,16 @@ class DigitClassifier(BaseModel):
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
+
+                # loss
+                loss = criterion(outputs, labels)
+                losses.append(loss.item())
+        loss = sum(losses) / len(losses)
         accuracy = correct / total
         self.logger.log(f'Accuracy: {accuracy}')
-        return accuracy
+        self.logger.log(f'Loss: {loss}')
+        
+        return accuracy, loss
     def plot_losses(self):
         save_dir = os.path.join('src','training','results')
         if not os.path.exists(save_dir):

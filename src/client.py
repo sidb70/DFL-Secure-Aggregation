@@ -115,8 +115,11 @@ class BaseClient:
         time.sleep(1.5) # wait for other clients to start
         for r in range(self.rounds):
             logger.log(f'Round {r}\n')
+            logger.log("Starting training")
             self.model.train()
+            logger.log("Starting sending")
             self.send_model()
+            logger.log("Starting aggregation")
             self.aggregate()
             self.current_round += 1
         loan_defaulter.fig.savefig(os.path.join(os.getcwd(),'src','training','results',f"client{self.id}.png"))
@@ -150,9 +153,10 @@ class BaseClient:
             time.sleep(0.1)
             if len(waiting_for) > 0:
                 logger.log(f'Waiting for {waiting_for}\n')
-    def post_model(self, data, neighbor):
+    def post_model(self, data_dict, neighbor):
         neighbor_addr = self.topology[neighbor]['ip'] + ':' + str(self.topology[neighbor]['port'])
         url = f'http://{neighbor_addr}/'
+        data = json.dumps(data_dict).encode('utf-8')
         try:
             response = requests.post(url, data=data)
             if response.status_code != 200:
@@ -199,11 +203,11 @@ class BenignClient(BaseClient):
         if not os.path.exists(os.path.join(self.models_base_dir, f'round{self.current_round}')):
             os.makedirs(os.path.join(self.models_base_dir, f'round{self.current_round}'))
         torch.save(self.model.state_dict, save_path)
-        data = {'id': self.id,'round': self.current_round,
+        data_dict = {'id': self.id,'round': self.current_round,
                 'num_samples': self.model.num_samples, 
                 'model_path': str(save_path)}
         for neighbor in self.neighbors:
-            self.post_model(data, neighbor)
+            self.post_model(data_dict, neighbor)
             #time.sleep(0.1)
     def aggregate(self):
         if self.is_synch:
@@ -270,12 +274,12 @@ class MaliciousClient(BaseClient):
         #     attack_model = self.attacker.attack(models)
         save_path = os.path.join(self.models_base_dir, f'round{self.current_round}', f'client_{self.id}.pt')
         torch.save(attack_model, save_path)
-        data = {'id': self.id,'round': self.current_round, 
+        data_dict = {'id': self.id,'round': self.current_round, 
                 'num_samples': self.model.num_samples, 
                 'model_path': str(save_path)}
         logger.log(f'Sending poisoned model to neighbors for round {self.current_round}\n')
         for neighbor in self.benign_neighbors:
-            self.post_model(data, neighbor)
+            self.post_model(data_dict, neighbor)
             #time.sleep(0.1)
     def aggregate(self):
         # malicous client has already waited to receive benign models. aggregate immediately

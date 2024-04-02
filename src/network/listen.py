@@ -5,6 +5,7 @@ import time
 from typing import Callable
 from logger import Logger
 from urllib.parse import unquote
+import json
 
 ## Global variable to store the callback and logger
 msg_callback = None
@@ -38,10 +39,11 @@ class MsgHandler(http.server.SimpleHTTPRequestHandler):
         post_data = self.rfile.read(content_length) # Gets the data itself
         try:
            
-            post_data = unquote(post_data) # decode
-            post_data = post_data.split('&')
-            post_data = [x.split('=') for x in post_data]
-            post_data = {x[0]:x[1] for x in post_data} # convert to dictionary
+            # post_data = unquote(post_data) # decode
+            # post_data = post_data.split('&')
+            # post_data = [x.split('=') for x in post_data]
+            # post_data = {x[0]:x[1] for x in post_data} # convert to dictionary
+            post_data = json.loads(post_data)
             #print(post_data)
 
             self.send_response(200) # Sends a response header
