@@ -67,9 +67,9 @@ class BaseClient:
         my_info = self.topology[int(args.id)]
         self.hostname = my_info['ip']
         self.port = my_info['port']
-        listen.set_globals(self.recieve_model, logger)
-        self.listener = listen.ModelListener(self.hostname, self.port)
-        self.listener.listen_for_models()
+        # listen.set_globals(self.receive_model, logger)
+        # self.listener = listen.ModelListener(self.hostname, self.port)
+        # self.listener.listen_for_models()
 
         # get neighbors
         self.neighbors = my_info['edges']
@@ -89,6 +89,10 @@ class BaseClient:
                                     'models', 'clients')
         if not os.path.exists(self.models_base_dir):
             os.makedirs(self.models_base_dir)
+        for r in range(self.rounds):
+            round_dir = os.path.join(self.models_base_dir, f'round{r}')
+            if not os.path.exists(round_dir):
+                os.makedirs(round_dir)
         
         self.load_aggregator()
         self.load_model()
@@ -109,7 +113,6 @@ class BaseClient:
         epochs = experiment_params['epochs_per_round']
         batch_size = experiment_params['batch_size']
         
-
         modelname = experiment_params['model_name']
         if modelname == 'loan_defaulter':
             self.model = LoanDefaulter(data_path, num_samples, self.id, epochs, batch_size, logger, evaluating=False)
@@ -121,59 +124,70 @@ class BaseClient:
     def train_fl(self):
         # listen on a separate thread
         #self.listener.listen_for_models()
-        time.sleep(1.5) # wait for other clients to start
+        time.sleep(5) # wait for other clients to start
         for r in range(self.rounds):
             logger.log(f'Round {r}\n')
             logger.log("Starting training")
             self.model.train()
+            print("Training complete client", self.id, "round", r)
             logger.log("Starting sending")
             self.send_model()
             logger.log("Starting aggregation")
             self.aggregate()
+            if self.id < 4:
+                torch.cuda.empty_cache()
+                print("Client ", self.id, "round", r, "empty cache")
+            
             self.current_round += 1
         time.sleep(3) # wait for other clients to finish
         logger.log(f'Training complete\n')
-        self.listener.shutdown()
-    def recieve_model(self, msg: dict):
-        if not self.is_synch and msg['round'] < self.current_round:
-            return
-        msg['id'] = int(msg['id'])
-        msg['round'] = int(msg['round'])
-        msg['num_samples'] = int(msg['num_samples'])
-        with self.received_msgs_lock:
-            if not self.is_synch and msg['round'] >= self.current_round:
-                # if async, only keep the latest model for each neighbor
-                self.received_msgs[self.current_round][msg['id']] = msg
-            elif self.is_synch:
-                # if synch, keep all models for each round
-                self.received_msgs[msg['round']][msg['id']] = msg
+        #self.listener.shutdown()
+    # def receive_model(self, msg: dict):
+    #     if not self.is_synch and msg['round'] < self.current_round:
+    #         return
+    #     msg['id'] = int(msg['id'])
+    #     msg['round'] = int(msg['round'])
+    #     msg['num_samples'] = int(msg['num_samples'])
+    #     with self.received_msgs_lock:
+    #         if not self.is_synch and msg['round'] >= self.current_round:
+    #             # if async, only keep the latest model for each neighbor
+    #             self.received_msgs[self.current_round][msg['id']] = msg
+    #         elif self.is_synch:
+    #             # if synch, keep all models for each round
+    #             self.received_msgs[msg['round']][msg['id']] = msg
 
-        logger.log(f'received message from {msg["id"]} for round {msg["round"]}\n')
+    #     logger.log(f'received message from {msg["id"]} for round {msg["round"]}\n')
     def wait_for_neighbors(self, waiting_for: set):
         while len(waiting_for)>0:
             # wait for neighbors to send their models
             with self.received_msgs_lock:
                 for neighbor in self.neighbors:
-                    if neighbor in waiting_for and self.received_msgs[self.current_round][neighbor] is not None:
+                    neighbor_path = os.path.join(self.models_base_dir, f'round{self.current_round}', f'client_{neighbor}.pt')
+                    if neighbor in waiting_for and os.path.exists(neighbor_path):
+                        # add neighbor's model to received messages
+                        self.received_msgs[self.current_round][neighbor] = {'model_path': neighbor_path, 
+                                                                            'num_samples': self.model.num_samples}
                         waiting_for.remove(neighbor)
-            time.sleep(0.1)
+
+            time.sleep(1)
             if len(waiting_for) > 0:
                 logger.log(f'Waiting for {waiting_for}\n')
-    def post_model(self, data_dict, neighbor):
-        neighbor_addr = self.topology[neighbor]['ip'] + ':' + str(self.topology[neighbor]['port'])
-        url = f'http://{neighbor_addr}/'
-        data = json.dumps(data_dict).encode('utf-8')
-        try:
-            response = requests.post(url, data=data)
-            if response.status_code != 200:
-                raise Exception(f'Status code: {response.status_code}')
-            else:
-                logger.log(f'Sent model to {neighbor} for round {self.current_round}\n')
-        except Exception as e:
-            if self.is_synch:
-                raise Exception(f'Could not send model to {neighbor}: {e}')
-            else:
-                logger.log(f'Could not send model to {neighbor}: {e}\n')
+
+    # def post_model(self, data_dict, neighbor):
+    #     neighbor_addr = self.topology[neighbor]['ip'] + ':' + str(self.topology[neighbor]['port'])
+    #     url = f'http://{neighbor_addr}/'
+    #     data = json.dumps(data_dict).encode('utf-8')
+    #     try:
+    #         response = requests.post(url, data=data)
+    #         if response.status_code != 200:
+    #             raise Exception(f'Status code: {response.status_code}')
+    #         else:
+    #             logger.log(f'Sent model to {neighbor} for round {self.current_round}\n')
+    #     except Exception as e:
+    #         if self.is_synch:
+    #             raise Exception(f'Could not send model to {neighbor}: {e}')
+    #         else:
+    #             logger.log(f'Could not send model to {neighbor}: {e}\n')
     def get_current_models(self):
         models = []
         with self.received_msgs_lock:
@@ -201,11 +215,11 @@ class BenignClient(BaseClient):
         #print('model_path', model_path)
         self.model_path = os.path.join(self.models_base_dir, f'round{self.current_round}', f'client_{self.id}.pt')
         torch.save(self.model.state_dict, self.model_path)
-        data_dict = {'id': self.id,'round': self.current_round,
-                'num_samples': self.model.num_samples, 
-                'model_path': str(self.model_path)}
-        for neighbor in self.neighbors:
-            self.post_model(data_dict, neighbor)
+        # data_dict = {'id': self.id,'round': self.current_round,
+        #         'num_samples': self.model.num_samples, 
+        #         'model_path': str(self.model_path)}
+        # for neighbor in self.neighbors:
+        #     self.post_model(data_dict, neighbor)
             #time.sleep(0.1)
     def aggregate(self):
         if self.is_synch:
@@ -272,18 +286,19 @@ class MaliciousClient(BaseClient):
         #     attack_model = self.attacker.attack(models)
         save_path = os.path.join(self.models_base_dir, f'round{self.current_round}', f'client_{self.id}.pt')
         torch.save(attack_model, save_path)
-        data_dict = {'id': self.id,'round': self.current_round, 
-                'num_samples': self.model.num_samples, 
-                'model_path': str(save_path)}
-        logger.log(f'Sending poisoned model to neighbors for round {self.current_round}\n')
-        for neighbor in self.benign_neighbors:
-            self.post_model(data_dict, neighbor)
+        # data_dict = {'id': self.id,'round': self.current_round, 
+        #         'num_samples': self.model.num_samples, 
+        #         'model_path': str(save_path)}
+        # logger.log(f'Sending poisoned model to neighbors for round {self.current_round}\n')
+        # for neighbor in self.benign_neighbors:
+        #     self.post_model(data_dict, neighbor)
             #time.sleep(0.1)
     def aggregate(self):
         # malicous client has already waited to receive benign models. aggregate immediately
-        models = self.get_current_models()
-        aggregated_model = self.aggregator.aggregate(models)
+        models_paths = self.get_current_models()
+        aggregated_model = self.aggregator.aggregate(models_paths)
         self.model.load_state_dict(aggregated_model)
+        del aggregated_model
         logger.log(f'Aggregated benign models\n')
   
 def is_malicious(id_num: int):

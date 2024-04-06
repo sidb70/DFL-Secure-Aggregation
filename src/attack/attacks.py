@@ -94,7 +94,7 @@ class Noise():
 
 def create_attacker(attack_type, attack_args, node_hash,logger):
     global device
-    device = 'cuda:' + str((node_hash %8) ) if torch.cuda.is_available() else 'cpu'
+    device = 'cuda:' + str((node_hash %8) )
     if attack_type == 'noise':
         return Noise(attack_args, logger)
     # elif attack_type == 'innerproduct':

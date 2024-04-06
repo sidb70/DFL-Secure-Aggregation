@@ -117,12 +117,14 @@ class DigitClassifier(BaseModel):
         self.logger = logger
         self.losses = []
         self.load_data()
-        self.device = 'cuda:' + str((self.node_hash %8) ) if torch.cuda.is_available() else 'cpu'
+        self.logger.log("Loaded dataset")
+        self.device = 'cuda:' + str((self.node_hash %8)) if torch.cuda.is_available() else 'cpu'
         self.model = Net().to(self.device)
+        self.logger.log("Sent model to device")
         self.state_dict = self.model.state_dict()
 
     def load_data(self):
-        dataset = datasets.MNIST('data', train=True, download=True,
+        dataset = datasets.MNIST('data', train=True, download=False,
                                     transform=transforms.Compose([
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.1307,), (0.3081,))
@@ -138,10 +140,12 @@ class DigitClassifier(BaseModel):
         # set node hash for reproducibility
         torch.manual_seed(self.node_hash)
         self.X_train, self.X_valid = torch.utils.data.random_split(dataset, [train_size, test_size])
+        
         self.X_train = DataLoader(self.X_train, batch_size=self.batch_size, shuffle=True)
         
         # delete validation set (FL evaluation will be done separately after training)
         del self.X_valid
+        del dataset
 
     def train(self):
         criterion = nn.CrossEntropyLoss()

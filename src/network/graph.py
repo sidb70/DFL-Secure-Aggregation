@@ -88,6 +88,8 @@ class UserGraph:
         m0: number of initial nodes
         m: number of edges to attach from each new node to existing nodes
         '''
+        if num_nodes < m0:
+            raise ValueError("Number of nodes must be greater than m0")
         for i in range(m0):
             is_malicious = i in malicious_nodes
             self.add_user(i, f'localhost', 50000+i, malicious=is_malicious)

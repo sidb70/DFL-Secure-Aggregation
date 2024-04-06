@@ -68,6 +68,14 @@ def wait_for_clients(processes: list):
             process.kill()
         print('Killed all clients')
         torch.cuda.empty_cache()
+        # clear model directory
+        model_dir = os.path.join('src','training','models','clients')
+        for round_dir in os.listdir(model_dir):
+            for file in os.listdir(os.path.join(model_dir, round_dir)):
+                os.remove(os.path.join(model_dir, round_dir, file))
+        for file in os.listdir('.'):
+            if file.startswith('core'):
+                os.remove(file)
         exit(0)
     signal.signal(signal.SIGINT, kill_clients)
     

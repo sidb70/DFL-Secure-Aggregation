@@ -65,10 +65,9 @@ class FedAvg(Aggregator):
         if log:
             self.logger.log(f"[FedAvg.aggregate] Aggregating models: num={len(models_paths)}")
         for model_path, num_samples in models_paths:
-            model = torch.load(model_path, map_location=device)
+            model = torch.load(model_path, map_location='cpu')
             if accum is None:
                 accum = {layer: torch.zeros_like(param).to(device) for layer, param in model.items()}
-
             for layer in accum:
                 accum[layer] += model[layer].to(device)
             del model
