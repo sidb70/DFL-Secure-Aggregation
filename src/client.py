@@ -168,6 +168,7 @@ class BaseClient:
                         self.received_msgs[self.current_round][neighbor] = {'model_path': neighbor_path, 
                                                                             'num_samples': self.model.num_samples}
                         waiting_for.remove(neighbor)
+                        logger.log(f'Received model from {neighbor}\n')
 
             time.sleep(1)
             if len(waiting_for) > 0:
@@ -196,6 +197,8 @@ class BaseClient:
                 #logger.log(str(self.received_msgs))
                 models = [(msg['model_path'], msg['num_samples']) for msg in self.received_msgs[self.current_round].values()]
                 self.received_msgs[self.current_round] = {} # send models to garbage collector
+            else:
+                logger.log(f'No models received for round {self.current_round}\n')
         models.append((self.model_path, self.model.num_samples))
         return models
     def aggregate(self):
@@ -273,29 +276,36 @@ class MaliciousClient(BaseClient):
             waiting_for = set(self.benign_neighbors)
             self.wait_for_neighbors(waiting_for)
 
-        if self.attack_type == 'noise':
+        if self.attack_type == 'noise' or self.attack_type == 'randomnoise':
             attack_model = self.attacker.attack(self.model.state_dict)
         elif self.attack_type=='signflip':
             prev_model = self.model.prev_model
             attack_model = self.attacker.attack(self.model.state_dict, prev_model)
+        else:
+            raise NotImplementedError(f'Attack type {self.attack_type} not implemented in client.py')
 
         # elif self.attack_type=='innerproduct':
         #     with self.received_msgs_lock:
-        #         models = [msg['model'] for msg in self.received_msgs[self.current_round].values()]
+        #         models = [msg['model'] for msg in .received_msgs[self.current_round].values()]
         #     models.append(self.model.state_dict)
         #     attack_model = self.attacker.attack(models)
-        save_path = os.path.join(self.models_base_dir, f'round{self.current_round}', f'client_{self.id}.pt')
-        torch.save(attack_model, save_path)
+        
         # data_dict = {'id': self.id,'round': self.current_round, 
         #         'num_samples': self.model.num_samples, 
         #         'model_path': str(save_path)}
-        # logger.log(f'Sending poisoned model to neighbors for round {self.current_round}\n')
+
+
+        self.model_path = os.path.join(self.models_base_dir, f'round{self.current_round}', f'client_{self.id}.pt')
+        torch.save(attack_model, self.model_path)
+        
+        logger.log(f'Sending poisoned model to neighbors for round {self.current_round}\n')
         # for neighbor in self.benign_neighbors:
         #     self.post_model(data_dict, neighbor)
             #time.sleep(0.1)
     def aggregate(self):
         # malicous client has already waited to receive benign models. aggregate immediately
         models_paths = self.get_current_models()
+        logger.log("model paths"+str( models_paths))
         aggregated_model = self.aggregator.aggregate(models_paths)
         self.model.load_state_dict(aggregated_model)
         del aggregated_model

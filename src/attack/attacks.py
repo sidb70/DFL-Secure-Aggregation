@@ -45,6 +45,27 @@ class Noise():
             model[k].data += torch.randn(model[k].shape).to(device) * self.strength 
             
         return model
+
+class RandomNoise():
+    """
+    Function to perform noise injection attack on the received weights.
+    """
+    def __init__(self, attack_args: dict, logger: Logger):
+        self.strength = attack_args['strength']
+        self.logger = logger
+        self.logger.log(f"[NoiseInjectionAttack] Initialized with strength: {self.strength}")
+
+    def attack(self, model: OrderedDict):
+        self.logger.log("[NoiseInjectionAttack] Performing noise injection attack")
+        random_model = copy.deepcopy(model)
+        lkeys = list(random_model.keys())
+        for k in lkeys:
+            self.logger.log(f"Layer noised: {k}")
+            # adding noise with mu =0, sigma=1 * strength
+            random_model[k] = torch.randn(random_model[k].shape).to(device) * self.strength
+        return random_model
+    
+
 # class InnerProductAttack:
 #     """
 #     Function to perform inner product attack on the received weights.
@@ -101,5 +122,7 @@ def create_attacker(attack_type, attack_args, node_hash,logger):
     #     return InnerProductAttack(attack_args, logger)
     elif attack_type=='signflip':
         return SignFlip(attack_args, logger)
+    elif attack_type=='randomnoise':
+        return RandomNoise(attack_args, logger)
     else:
         raise ValueError(f'Unknown attack type: {attack_type}')
