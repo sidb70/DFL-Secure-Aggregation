@@ -79,7 +79,7 @@ class UserGraph:
         '''
         for i in range(num_nodes):
             is_malicious = i in malicious_nodes
-            self.add_user(i, f'localhost', 6000+i, malicious=is_malicious)
+            self.add_user(i, f'localhost', 50000+i, malicious=is_malicious)
         self.make_connections(p=edge_density)
     def create_scale_free_graph(self, num_nodes, m0, m, malicious_nodes):
         '''
@@ -90,7 +90,7 @@ class UserGraph:
         '''
         for i in range(m0):
             is_malicious = i in malicious_nodes
-            self.add_user(i, f'localhost', 6000+i, malicious=is_malicious)
+            self.add_user(i, f'localhost', 50000+i, malicious=is_malicious)
         self.make_connections(p=1.0)
         for i in range(m0, num_nodes):
             # choose m nodes to connect to
@@ -98,7 +98,7 @@ class UserGraph:
             choices = [item for sublist in choices for item in sublist]
 
             is_malicious = i in malicious_nodes
-            self.add_user(i, f'localhost', 6000+i, malicious=i in malicious_nodes)
+            self.add_user(i, f'localhost', 50000+i, malicious=i in malicious_nodes)
 
             while self.user_degree(i) < m: # choose m neighbors
                 neighbor = random.choice(choices)

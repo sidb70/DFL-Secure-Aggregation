@@ -13,7 +13,6 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
 import datetime
 import os
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # class DigitClassifierTensorFlow(BaseModel):
 #     def __init__(self, epochs: int, batch_size: int, num_samples: int, node_hash: int, logger: logging.Logger):
@@ -118,7 +117,8 @@ class DigitClassifier(BaseModel):
         self.logger = logger
         self.losses = []
         self.load_data()
-        self.model = Net().to(device)
+        self.device = 'cuda:' + str((self.node_hash %8) ) if torch.cuda.is_available() else 'cpu'
+        self.model = Net().to(self.device)
         self.state_dict = self.model.state_dict()
 
     def load_data(self):
@@ -149,7 +149,7 @@ class DigitClassifier(BaseModel):
         self.model.train()
         for epoch in range(self.epochs):
             for batch_idx, (inputs, labels) in enumerate(self.X_train):
-                inputs, labels = inputs.to(device), labels.to(device)
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
                 optimizer.zero_grad()
                 outputs = self.model(inputs)
                 loss = criterion(outputs, labels)
@@ -167,7 +167,7 @@ class DigitClassifier(BaseModel):
         with torch.no_grad():
             for data in self.X_valid:
                 images, labels = data
-                images, labels = images.to(device), labels.to(device)
+                images, labels = images.to(self.device), labels.to(self.device)
                 outputs = self.model(images)
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
@@ -203,12 +203,12 @@ if __name__ == '__main__':
                                  node_hash=42,logger=DummyLogger(), 
                                  evaluating=False)
     # print num samples
-    print(len(classifier.X_train))
-    classifier.train()
-    plt.plot(classifier.losses)
-    plt.show()
-    save_dir = os.path.join('src','training','results')
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    dt = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-    plt.savefig(os.path.join('src','training','results',f'MNIST_accuracy_{dt}.png'))
+    # print(len(classifier.X_train))
+    # classifier.train()
+    # plt.plot(classifier.losses)
+    # plt.show()
+    # save_dir = os.path.join('src','training','results')
+    # if not os.path.exists(save_dir):
+    #     os.makedirs(save_dir)
+    # dt = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+    # plt.savefig(os.path.join('src','training','results',f'MNIST_accuracy_{dt}.png'))

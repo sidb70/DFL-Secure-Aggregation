@@ -11,6 +11,7 @@ import random
 import yaml
 import logging
 import eval
+import torch
 import signal
 
 # seed
@@ -66,6 +67,7 @@ def wait_for_clients(processes: list):
         for process in processes:
             process.kill()
         print('Killed all clients')
+        torch.cuda.empty_cache()
         exit(0)
     signal.signal(signal.SIGINT, kill_clients)
     

@@ -54,6 +54,7 @@ class BaseClient:
         self.received_msgs_lock = None
         self.aggregator = None
         self.model = None
+        self.model_path = None
         # get topology
         self.topology = {int(node_id):val for node_id,val in topology_json.items()}
         
@@ -66,10 +67,18 @@ class BaseClient:
         my_info = self.topology[int(args.id)]
         self.hostname = my_info['ip']
         self.port = my_info['port']
+        listen.set_globals(self.recieve_model, logger)
         self.listener = listen.ModelListener(self.hostname, self.port)
+        self.listener.listen_for_models()
 
         # get neighbors
         self.neighbors = my_info['edges']
+
+        if self.is_synch:
+            self.received_msgs = {round_num: {neighbor:None for neighbor in self.neighbors} for round_num in range(self.rounds)}
+        else:
+            self.received_msgs = {round_num: {} for round_num in range(self.rounds)}
+        self.received_msgs_lock  = threading.Lock()
 
         logger.log(f'Got topology: {self.topology}\n')
         logger.log(f'My info: {my_info}\n')
@@ -89,7 +98,7 @@ class BaseClient:
         Load the aggregator
         """
         aggregation = experiment_params['aggregation']
-        self.aggregator = strategies.create_aggregator(aggregation, experiment_params, logger)
+        self.aggregator = strategies.create_aggregator(aggregation, experiment_params, self.id,logger)
         logger.log(f'Loaded aggregator {aggregation}\n')
     def load_model(self):
         """
@@ -111,7 +120,7 @@ class BaseClient:
         logger.log(f'Loaded model {modelname}\n')
     def train_fl(self):
         # listen on a separate thread
-        self.listener.listen_for_models()
+        #self.listener.listen_for_models()
         time.sleep(1.5) # wait for other clients to start
         for r in range(self.rounds):
             logger.log(f'Round {r}\n')
@@ -122,7 +131,6 @@ class BaseClient:
             logger.log("Starting aggregation")
             self.aggregate()
             self.current_round += 1
-        loan_defaulter.fig.savefig(os.path.join(os.getcwd(),'src','training','results',f"client{self.id}.png"))
         time.sleep(3) # wait for other clients to finish
         logger.log(f'Training complete\n')
         self.listener.shutdown()
@@ -132,8 +140,6 @@ class BaseClient:
         msg['id'] = int(msg['id'])
         msg['round'] = int(msg['round'])
         msg['num_samples'] = int(msg['num_samples'])
-        model_path= msg['model_path']
-        msg['model'] = torch.load(model_path)
         with self.received_msgs_lock:
             if not self.is_synch and msg['round'] >= self.current_round:
                 # if async, only keep the latest model for each neighbor
@@ -174,9 +180,9 @@ class BaseClient:
             # aggregate models
             if len(self.received_msgs[self.current_round]) > 0:
                 #logger.log(str(self.received_msgs))
-                models = [(msg['model'], msg['num_samples']) for msg in self.received_msgs[self.current_round].values()]
+                models = [(msg['model_path'], msg['num_samples']) for msg in self.received_msgs[self.current_round].values()]
                 self.received_msgs[self.current_round] = {} # send models to garbage collector
-        models.append((self.model.state_dict, self.model.num_samples))
+        models.append((self.model_path, self.model.num_samples))
         return models
     def aggregate(self):
         raise NotImplementedError
@@ -186,26 +192,18 @@ class BaseClient:
 class BenignClient(BaseClient):
     def __init__(self, id_num: int):
         super().__init__(id_num)
-        if self.is_synch:
-            self.received_msgs = {round_num: {neighbor:None for neighbor in self.neighbors} for round_num in range(self.rounds)}
-        else:
-            self.received_msgs = {round_num: {} for round_num in range(self.rounds)}
-        self.received_msgs_lock  = threading.Lock()
-        listen.set_globals(self.recieve_model, logger) # set the callback for the listen module
+        self.model_path = None
         ## initialize received messages and lock 
-        time.sleep(1.5) # wait for other clients to start
+        
     def send_model(self):
         # send model to neighbors
-        if not os.path.exists(os.path.join('src', 'training', 'models', 'clients')):
-            os.makedirs(os.path.join('src', 'training', 'models', 'clients'))
+        
         #print('model_path', model_path)
-        save_path = os.path.join(self.models_base_dir, f'round{self.current_round}', f'client_{self.id}.pt')
-        if not os.path.exists(os.path.join(self.models_base_dir, f'round{self.current_round}')):
-            os.makedirs(os.path.join(self.models_base_dir, f'round{self.current_round}'))
-        torch.save(self.model.state_dict, save_path)
+        self.model_path = os.path.join(self.models_base_dir, f'round{self.current_round}', f'client_{self.id}.pt')
+        torch.save(self.model.state_dict, self.model_path)
         data_dict = {'id': self.id,'round': self.current_round,
                 'num_samples': self.model.num_samples, 
-                'model_path': str(save_path)}
+                'model_path': str(self.model_path)}
         for neighbor in self.neighbors:
             self.post_model(data_dict, neighbor)
             #time.sleep(0.1)
@@ -213,8 +211,8 @@ class BenignClient(BaseClient):
         if self.is_synch:
             waiting_for = set(self.neighbors)
             self.wait_for_neighbors(waiting_for)
-        models = self.get_current_models()
-        aggregated_model = self.aggregator.aggregate(models)
+        models_paths = self.get_current_models()
+        aggregated_model = self.aggregator.aggregate(models_paths)
         self.model.load_state_dict(aggregated_model)
         logger.log(f'Aggregated models\n')
 
@@ -226,7 +224,6 @@ class MaliciousClient(BaseClient):
         :param logger: The logger object
         '''
         super().__init__(id_num)
-        listen.set_globals(self.recieve_model, logger)
         self.load_attacker()
   
     def load_attacker(self):
@@ -237,7 +234,8 @@ class MaliciousClient(BaseClient):
         self.attack_type =experiment_params['attack_type']
         attack_args = experiment_params['attack_args']
         attack_args['defense'] = experiment_params['aggregation']
-        self.attacker = attacks.create_attacker(attack_type=self.attack_type, attack_args=attack_args, logger=logger)
+        self.attacker = attacks.create_attacker(attack_type=self.attack_type, attack_args=attack_args, 
+                                                node_hash=self.id,logger=logger)
         self.benign_neighbors = [int(node_id) for node_id in self.neighbors if not is_malicious(int(node_id))]
         if self.is_synch:
             self.received_msgs = {round_num: {benign_neighbor:None \

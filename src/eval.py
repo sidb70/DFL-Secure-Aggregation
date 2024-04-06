@@ -45,9 +45,9 @@ def eval_global_model():
     try:
         with open(os.path.join(save_dir,f'{experiment_id}.json'),'r') as f:
             results = json.load(f)
-        print(f'Loaded results for experiment {experiment_id}')
+        print(f'Loaded results for experiment {experiment_id}\n{experiment_desc}')
     except FileNotFoundError:
-        print(f'Creating new results file for experiment {experiment_id}')
+        print(f'Creating new results file for experiment {experiment_id}\n{experiment_desc}')
         # create new results file
         results = {}
         results['id'] = experiment_id

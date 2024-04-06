@@ -9,20 +9,21 @@ from .Model import BaseModel
 from logging import Logger
 import copy
 
-losses = [[0,0]]
-plt.ion()
-fig = plt.figure()
-ax = fig.add_subplot(111)
-line1, line2 = ax.plot(losses)
-ax.set_xlabel('Epoch')
-ax.set_ylabel('Loss')
-ax.set_ylim(0, 1)
-ax.legend(['Train Loss', 'Validation Loss'])
+
         
 
 
 class LoanDefaulter(BaseModel):
     def __init__(self, data_path: str, num_samples: int, node_hash: int, epochs: int, batch_size: int, logger: Logger, evaluating=False):
+        losses = [[0,0]]
+        plt.ion()
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        line1, line2 = ax.plot(losses)
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Loss')
+        ax.set_ylim(0, 1)
+        ax.legend(['Train Loss', 'Validation Loss'])
         super().__init__(num_samples, node_hash, epochs, batch_size, evaluating=evaluating)
         self.logger = logger
         self.data = self.get_loan_defaulter_data(data_path)

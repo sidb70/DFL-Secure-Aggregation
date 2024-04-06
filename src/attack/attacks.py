@@ -3,6 +3,8 @@ from logger import Logger
 from skimage.util import random_noise
 from collections import OrderedDict
 import copy
+
+device=None
 class SignFlip:
     def __init__(self, attack_args: dict, logger: Logger):
         self.logger=logger
@@ -39,8 +41,8 @@ class Noise():
         for k in lkeys:
             self.logger.log(f"Layer noised: {k}")
             # adding noise with mu =0, sigma=1 * strength
-            model[k].data += torch.randn(model[k].shape).to('cuda' if torch.cuda.is_available() else 'cpu') \
-                * self.strength 
+            model[k] = model[k].to(device)
+            model[k].data += torch.randn(model[k].shape).to(device) * self.strength 
             
         return model
 # class InnerProductAttack:
@@ -90,7 +92,9 @@ class Noise():
 
     
 
-def create_attacker(attack_type, attack_args, logger):
+def create_attacker(attack_type, attack_args, node_hash,logger):
+    global device
+    device = 'cuda:' + str((node_hash %8) ) if torch.cuda.is_available() else 'cpu'
     if attack_type == 'noise':
         return Noise(attack_args, logger)
     # elif attack_type == 'innerproduct':

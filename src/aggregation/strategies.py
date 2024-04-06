@@ -6,9 +6,8 @@ import torch
 import numpy as np
 import copy
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-def create_aggregator(aggregator_type, experiment_params, logger):
+device =None
+def create_aggregator(aggregator_type, experiment_params, node_hash, logger):
     """
     Create an aggregator based on the aggregator type.
 
@@ -19,6 +18,8 @@ def create_aggregator(aggregator_type, experiment_params, logger):
     Returns:
         Aggregator: An aggregator object.
     """
+    global device
+    device = 'cuda:' + str((node_hash %8) ) if torch.cuda.is_available() else 'cpu'
     if aggregator_type == 'fedavg':
         return FedAvg(logger)
     elif aggregator_type == 'median':
@@ -42,33 +43,38 @@ class FedAvg(Aggregator):
     def __init__(self, logger, **kwargs):
         super().__init__(logger, **kwargs)
 
-    def aggregate(self, models: list, log=True):
+    def aggregate(self, models_paths: list, log=True):
         """
         Weighted average of the models.
 
         Args:
             models: Dictionary with the models (node: model, num_samples).
         """
-        if len(models) == 0:
+        if len(models_paths) == 0:
             self.logger.log("[FedAvg] Trying to aggregate models when there are no models")
             return None
 
 
         # Total Samples
-        total_samples = sum(w for _, w in models)
+        total_samples = sum(w for _, w in models_paths)
 
         # Create a Zero Model
-        accum = {layer: torch.zeros_like(param) for layer, param in models[-1][0].items()}
+        accum = None
 
         # Add weighted models
         if log:
-            self.logger.log(f"[FedAvg.aggregate] Aggregating models: num={len(models)}")
-        for model, num_samples in models:
+            self.logger.log(f"[FedAvg.aggregate] Aggregating models: num={len(models_paths)}")
+        for model_path, num_samples in models_paths:
+            model = torch.load(model_path, map_location=device)
+            if accum is None:
+                accum = {layer: torch.zeros_like(param).to(device) for layer, param in model.items()}
+
             for layer in accum:
-                accum[layer] += model[layer]
+                accum[layer] += model[layer].to(device)
+            del model
         # normalize by number of clients
         for layer in accum:
-            accum[layer] /= len(models)
+            accum[layer] /= len(models_paths)
         # Normalize by the number of samples
         # for layer in accum:
         #     accum[layer] /= total_samples
@@ -146,14 +152,14 @@ class Median(Aggregator):
         # Create a Zero Model
         accum = (models[-1][0]).copy()
         for layer in accum:
-            accum[layer] = torch.zeros_like(accum[layer])
+            accum[layer] = torch.zeros_like(accum[layer]).to(device)
 
         # Add weighteds models
         self.logger.log("[Median.aggregate] Aggregating models: num={}".format(len(models)))
 
         # Calculate the trimmedmean for each parameter
         for layer in accum:
-            weight_layer = accum[layer]
+            weight_layer = accum[layer].to(device)
             # get the shape of layer tensor
             l_shape = list(weight_layer.shape)
 
@@ -161,7 +167,7 @@ class Median(Aggregator):
             number_layer_weights = torch.numel(weight_layer)
             # if its 0-d tensor
             if l_shape == []:
-                weights = torch.tensor([models_params[j][layer] for j in range(0, total_models)])
+                weights = torch.tensor([models_params[j][layer].to(device) for j in range(0, total_models)]).to(device)
                 weights = weights.double()
                 w = self.get_median(weights)
                 accum[layer] = w
@@ -170,9 +176,9 @@ class Median(Aggregator):
                 # flatten the tensor
                 weight_layer_flatten = weight_layer.view(number_layer_weights)
 
-                # flatten the tensor of each model
-                models_layer_weight_flatten = torch.stack([models_params[j][layer].view(number_layer_weights) for j in range(0, total_models)], 0)
-
+                # flatten the tensor of each model put all on the same device
+                models_layer_weight_flatten = torch.stack([models_params[j][layer].to(device).view(number_layer_weights) for j in range(0, total_models)], 0)
+                
                 # get the weight list [w1j,w2j,··· ,wmj], where wij is the jth parameter of the ith local model
                 median = self.get_median(models_layer_weight_flatten)
                 accum[layer] = median.view(l_shape)
@@ -208,7 +214,7 @@ class Krum(Aggregator):
         # Create a Zero Model
         accum = copy.deepcopy(models[-1][0])
         for layer in accum:
-            accum[layer] = torch.zeros_like(accum[layer]).cpu()
+            accum[layer] = torch.zeros_like(accum[layer]).to(device)
 
         # Add weighteds models
         self.logger.log("[Krum.aggregate] Aggregating models: num={}".format(len(models)))
@@ -230,13 +236,13 @@ class Krum(Aggregator):
                     distance = 0
                 else:
                     for layer in m1:
-                        l1 = m1[layer].detach().clone().cpu()
+                        l1 = m1[layer].to(device)
                         # l1 = l1.view(len(l1), 1)
 
-                        l2 = m2[layer].detach().clone().cpu()
+                        l2 = m2[layer].to(device)
                         # l2 = l2.view(len(l2), 1)
                         
-                        distance += np.linalg.norm(l1 - l2)
+                        distance += torch.linalg.norm(l1 - l2)
                 distance_list[i] += distance
 
             if min_distance_sum > distance_list[i]:
@@ -247,9 +253,8 @@ class Krum(Aggregator):
         # Assign the model with min distance with others as the aggregated model
         m, _ = models[min_index]
         for layer in m:
-            if torch.cuda.is_available():
-                accum[layer]=accum[layer].to(device)
-            accum[layer] = accum[layer] + m[layer]
+            accum[layer]=accum[layer].to(device)
+            accum[layer] = accum[layer] + m[layer].to(device)
             
         return accum
 
