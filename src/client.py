@@ -136,7 +136,7 @@ class BaseClient:
             self.aggregate()
             if self.id < 4:
                 torch.cuda.empty_cache()
-                print("Client ", self.id, "round", r, "empty cache")
+                print("Client ", self.id, "round", r, "emptied cache")
             
             self.current_round += 1
         time.sleep(3) # wait for other clients to finish

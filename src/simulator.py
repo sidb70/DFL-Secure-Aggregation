@@ -69,25 +69,30 @@ def wait_for_clients(processes: list):
         print('Killed all clients')
         torch.cuda.empty_cache()
         # clear model directory
-        model_dir = os.path.join('src','training','models','clients')
-        for round_dir in os.listdir(model_dir):
-            for file in os.listdir(os.path.join(model_dir, round_dir)):
-                os.remove(os.path.join(model_dir, round_dir, file))
-        for file in os.listdir('.'):
-            if file.startswith('core'):
-                os.remove(file)
+        delete_files()
         exit(0)
     signal.signal(signal.SIGINT, kill_clients)
     
     for process in processes:
         process.wait()
     print('All clients finished')
+def delete_files():
+    """
+    Delete files in the models and core* files
+    """
+    model_dir = os.path.join('src','training','models','clients')
+    # for each round dir
+    for round_dir in os.listdir(model_dir):
+        round_dir = os.path.join(model_dir, round_dir)
+        # delete each file in directory
+        for file in os.listdir(round_dir):
+            os.remove(os.path.join(round_dir, file))
 
-def eval_global_model():
-    """
-    Evaluate the global model.
-    """
-    eval.eval_global_model()
+    # remove core files
+    
+    for file in os.listdir('.'):
+        if file.startswith('core'):
+            os.remove(file)
 
 def run_simulation(params):
     """
@@ -107,6 +112,7 @@ def run_simulation(params):
     ### get args
     num_nodes = params['nodes']
     malicious_proportion = params['malicious_proportion']
+    exp_id = params['id']
 
     if not params['use_saved_topology']:
         #### create network graph
@@ -135,15 +141,9 @@ def run_simulation(params):
     # print(topology.to_json())
     processes = run_clients(num_nodes)
     wait_for_clients(processes)
-    eval_global_model()
-
-    # delete models
-        # clear model directory
-    # model_dir = os.path.join('src','training','models','clients')
-    # for file in os.listdir(model_dir):
-    #     os.remove(os.path.join(model_dir, file))
-    #
-    # uvicorn.run(app, host="localhost", port=server_port)
+    eval.eval_global_model()
+    eval.make_plot(exp_id)
+    delete_files()
 
 
 if __name__=='__main__':

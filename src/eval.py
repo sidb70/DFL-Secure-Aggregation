@@ -74,14 +74,15 @@ def eval_global_model():
     print("Evaluating global model")
     accuracies_by_round = []
     losses_by_round = []
-    for r in range(experiment_params['rounds']):
-        print("\nEvaluating round", r)
+    for r in range(1,experiment_params['rounds']):
+        print("\tRound ", r,"evaluation")
         accuracies = []
         losses = []
         for i in range(num_clients):
-            print("Evaluating client", i)
             if topology[i]['malicious']:
+                print("Skipping malicious client", i)
                 continue
+            print("Evaluating client", i)
             client_model = torch.load(os.path.join(models_pt_dir,f'round{r}',f'client_{i}.pt')) 
             eval_model.load_state_dict(client_model)
             accuracy, loss = eval_model.evaluate()
@@ -112,6 +113,27 @@ def eval_global_model():
 
     # plt.savefig(os.path.join('src','training','results','accuracy_by_round.png'))
     
+def make_plot(exp_id):
+    experiment_json_path = os.path.join('src','training','results',f'{exp_id}.json') 
+    with open(experiment_json_path,'r') as f:
+        results = json.load(f)
+
+    byzantine_proportion_legend = []
+    print(len(results['experiments']))
+    for i in range(len(results['experiments'])):
+        accuracies_by_round = results['experiments'][i]['accuracies_by_round']
+        experiment_params = results['experiments'][i]['params']
+        byzantine_proportion = experiment_params['malicious_proportion']
+        byzantine_proportion_legend.append(str(byzantine_proportion*100) + '% Byzantine')
+
+        plt.plot(range(1,len(accuracies_by_round)+1), accuracies_by_round, label=f'Byzantine Proportion: {byzantine_proportion}')
     
+    plt.legend(byzantine_proportion_legend)
+    plt.xlabel('Round')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy by Round')
+    plt.savefig(os.path.join('src','training','results',f'{exp_id}accuracy_by_round.png'))
+    #plt.show()
 if __name__=='__main__':
-    eval_global_model()
+    #eval_global_model()
+    make_plot(1)
