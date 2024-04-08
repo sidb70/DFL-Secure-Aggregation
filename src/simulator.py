@@ -179,7 +179,7 @@ class DFLTrainer:
 
         aggregator = strategies.create_aggregator(node_hash)
         aggregated_model = aggregator.aggregate(model_paths)
-        print("Node hash: ", node_hash, "aggregation complete")
+        print("Node ", node_hash, "aggregation complete")
 
         # load model
         model = DigitClassifier(epochs=self.epochs_per_round, batch_size=self.batch_size, num_samples=self.num_samples,
@@ -187,8 +187,10 @@ class DFLTrainer:
         model.model.load_state_dict(aggregated_model)
 
         # save model for next round
-        model.save_model(os.path.join(self.models_base_dir, f'round_{self.current_round+1}', f'node_{node_hash}.pt'))
-        
+        save_dir = os.path.join(self.models_base_dir, f'round_{self.current_round+1}')
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        model.save_model(os.path.join(save_dir, f'node_{node_hash}.pt'))
         # if malicious, dont evaluate. Instead, attack the model
         if self.topology[node_hash]['malicious']:
             #attacker
