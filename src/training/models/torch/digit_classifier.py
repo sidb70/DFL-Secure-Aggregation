@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 # from tensorflow.keras import layers, Sequential
 import logging
 import numpy as np
-from logging import Logger
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -85,6 +84,10 @@ import os
 #         plt.legend(loc='upper right')
 #         plt.title('Training and Validation Loss')
 #         plt.show()
+def load_data():
+    mnist_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+    mnist_dataset = datasets.MNIST(root='data', train=True, transform=mnist_transform, download=True)
+    return mnist_dataset
 
 class Net(nn.Module):
     def __init__(self):
@@ -112,64 +115,47 @@ class Net(nn.Module):
         output = F.log_softmax(x, dim=1)
         return output
 class DigitClassifier(BaseModel):
-    def __init__(self, epochs: int, batch_size: int, num_samples: int, node_hash: int,  logger: Logger, evaluating=False):
+    def __init__(self, epochs: int, batch_size: int, num_samples: int, 
+                 node_hash: int, evaluating=False, device=None):
         super().__init__(num_samples, node_hash, epochs, batch_size, evaluating=evaluating)
-        self.logger = logger
-        self.losses = []
-        self.load_data()
-        self.logger.log("Loaded dataset")
-        self.device = 'cuda:' + str((self.node_hash %8)) if torch.cuda.is_available() else 'cpu'
+
+        # get number of gpus
+        cuda_devices = torch.cuda.device_count()
+        self.device = 'cuda:' + str(self.node_hash % cuda_devices) if cuda_devices > 0 else 'cpu'
+ 
         self.model = Net().to(self.device)
-        self.logger.log("Sent model to device")
-        self.state_dict = self.model.state_dict()
+    def load_model(self, path):
+        self.model.load_state_dict(torch.load(path))
 
-    def load_data(self):
-        dataset = datasets.MNIST('data', train=True, download=False,
-                                    transform=transforms.Compose([
-                                        transforms.ToTensor(),
-                                        transforms.Normalize((0.1307,), (0.3081,))
-                                    ]))
-        if self.evaluating:
-            # use whole dataset for valid set
-            self.X_valid = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
-            return
-        
-        #training set should have num_samples samples
-        train_size = int(self.num_samples)
-        test_size = len(dataset) - train_size
-        # set node hash for reproducibility
-        torch.manual_seed(self.node_hash)
-        self.X_train, self.X_valid = torch.utils.data.random_split(dataset, [train_size, test_size])
-        
-        self.X_train = DataLoader(self.X_train, batch_size=self.batch_size, shuffle=True)
-        
-        # delete validation set (FL evaluation will be done separately after training)
-        del self.X_valid
-        del dataset
-
-    def train(self):
+    def train(self, subset_dataset):
+        X_train = DataLoader(subset_dataset, batch_size=self.batch_size, shuffle=True)
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         self.model.train()
+        
         for epoch in range(self.epochs):
-            for batch_idx, (inputs, labels) in enumerate(self.X_train):
+            losses = []
+            for batch_idx, (inputs, labels) in enumerate(X_train):
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 optimizer.zero_grad()
                 outputs = self.model(inputs)
                 loss = criterion(outputs, labels)
+                losses.append(loss.item())
                 loss.backward()
-                optimizer.step()
-                self.losses.append(loss.item())
-                self.logger.log(f'Epoch {epoch}, Batch {batch_idx}, Loss: {loss.item()}')
-        self.state_dict = self.model.state_dict()
-    def evaluate(self):
+                optimizer.step()   
+            loss = sum(losses) / len(losses)
+            #print(f'Node {self.node_hash} Epoch {epoch + 1}/{self.epochs} Loss: {loss}')
+
+
+    def evaluate(self, dataset):
+        X_valid = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         self.model.eval()
         correct = 0
         total = 0
         losses = []
         criterion = nn.CrossEntropyLoss()
         with torch.no_grad():
-            for data in self.X_valid:
+            for data in X_valid:
                 images, labels = data
                 images, labels = images.to(self.device), labels.to(self.device)
                 outputs = self.model(images)
@@ -182,21 +168,11 @@ class DigitClassifier(BaseModel):
                 losses.append(loss.item())
         loss = sum(losses) / len(losses)
         accuracy = correct / total
-        self.logger.log(f'Accuracy: {accuracy}')
-        self.logger.log(f'Loss: {loss}')
         
         return accuracy, loss
-    def plot_losses(self):
-        save_dir = os.path.join('src','training','results')
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        dt = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-        plt.plot(self.losses)
-        plt.xlabel('Batch')
-        plt.ylabel('Loss')
-        plt.title('Training Loss')
-        plt.savefig(os.path.join('src','training','results',f'MNIST_loss_{self.node_hash}.png'))
 
+    def save_model(self, path):
+        torch.save(self.model.state_dict(), path)
 
 if __name__ == '__main__':
     class DummyLogger:

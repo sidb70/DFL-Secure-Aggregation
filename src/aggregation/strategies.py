@@ -5,34 +5,41 @@ Modified under the GNU General Public License v3.0
 import torch
 import numpy as np
 import copy
+import yaml
+import os
 
+experiment_yaml = os.path.join('src','config', 'experiment.yaml')
+with open(experiment_yaml) as f:
+    experiment_params = yaml.safe_load(f)
 device =None
-def create_aggregator(aggregator_type, experiment_params, node_hash, logger):
+
+def create_aggregator(node_hash):
     """
     Create an aggregator based on the aggregator type.
 
     Args:
         aggregator_type (str): The type of aggregator to create.
-        logger (Logger): A logger object to log messages.
 
     Returns:
         Aggregator: An aggregator object.
     """
     global device
-    device = 'cuda:' + str((node_hash %8) ) if torch.cuda.is_available() else 'cpu'
+    global experiment_params
+    aggregator_type = experiment_params['aggregation']
+    num_gpus = torch.cuda.device_count()
+    device = 'cuda:' + str(node_hash % num_gpus) if num_gpus > 0 else 'cpu'
     if aggregator_type == 'fedavg':
-        return FedAvg(logger)
+        return FedAvg()
     elif aggregator_type == 'median':
-        return Median(logger)
+        return Median()
     elif aggregator_type == 'krum':
-        return Krum(logger)
+        return Krum()
     elif aggregator_type == 'trimmedmean':
-        return TrimmedMean(logger, beta=int(experiment_params['beta']))
+        return TrimmedMean(beta=int(experiment_params['beta']))
     else:
         raise ValueError(f"Aggregator type {aggregator_type} not recognized")
 class Aggregator:
-    def __init__(self, logger, **kwargs):
-        self.logger = logger
+    def __init__(self,  **kwargs):
         self.kwargs = kwargs
 class FedAvg(Aggregator):
     """
@@ -40,8 +47,8 @@ class FedAvg(Aggregator):
     Paper: https://arxiv.org/abs/1602.05629
     """
 
-    def __init__(self, logger, **kwargs):
-        super().__init__(logger, **kwargs)
+    def __init__(self,  **kwargs):
+        super().__init__( **kwargs)
 
     def aggregate(self, models_paths: list, log=True):
         """
@@ -51,25 +58,25 @@ class FedAvg(Aggregator):
             models: Dictionary with the models (node: model, num_samples).
         """
         if len(models_paths) == 0:
-            self.logger.log("[FedAvg] Trying to aggregate models when there are no models")
+            print("[FedAvg] Trying to aggregate models when there are no models")
             return None
 
 
         # Total Samples
-        total_samples = sum(w for _, w in models_paths)
+        # total_samples = sum(w for _, w in models_paths)
 
         # Create a Zero Model
         accum = None
 
         # Add weighted models
         if log:
-            self.logger.log(f"[FedAvg.aggregate] Aggregating models: num={len(models_paths)}")
-        for model_path, num_samples in models_paths:
-            model = torch.load(model_path, map_location='cpu')
+            print(f"[FedAvg.aggregate] Aggregating models: num={len(models_paths)}")
+        for model_path in models_paths:
+            model = torch.load(model_path, map_location=device)
             if accum is None:
                 accum = {layer: torch.zeros_like(param).to(device) for layer, param in model.items()}
             for layer in accum:
-                accum[layer] += model[layer].to(device)
+                accum[layer] += model[layer]
             del model
         # normalize by number of clients
         for layer in accum:
@@ -87,8 +94,8 @@ class Median(Aggregator):
     Paper: https://arxiv.org/pdf/1803.01498.pdf
     """
 
-    def __init__(self, logger, **kwargs):
-        super().__init__(logger, **kwargs)
+    def __init__(self,  **kwargs):
+        super().__init__( **kwargs)
 
     def get_median(self, weights):
         """
@@ -103,7 +110,7 @@ class Median(Aggregator):
         # check if the weight tensor has enough space
         weight_len = len(weights)
         if weight_len == 0:
-            self.logger.log(
+            print(
                 "[Median] Trying to aggregate models when there is no models"
             )
             return None
@@ -139,7 +146,7 @@ class Median(Aggregator):
         """
         # Check if there are models to aggregate
         if len(models) == 0:
-            self.logger.log(
+            print(
                                "[Median] Trying to aggregate models when there is no models"
             )
             return None
@@ -154,7 +161,7 @@ class Median(Aggregator):
             accum[layer] = torch.zeros_like(accum[layer]).to(device)
 
         # Add weighteds models
-        self.logger.log("[Median.aggregate] Aggregating models: num={}".format(len(models)))
+        print("[Median.aggregate] Aggregating models: num={}".format(len(models)))
 
         # Calculate the trimmedmean for each parameter
         for layer in accum:
@@ -188,8 +195,8 @@ class Krum(Aggregator):
     Paper: https://papers.nips.cc/paper/2017/hash/f4b9ec30ad9f68f89b29639786cb62ef-Abstract.html
     """
 
-    def __init__(self, logger, **kwargs):
-        super().__init__(logger, **kwargs)
+    def __init__(self,  **kwargs):
+        super().__init__( **kwargs)
 
     def aggregate(self, models):
         """
@@ -201,7 +208,7 @@ class Krum(Aggregator):
         """
         # Check if there are models to aggregate
         if len(models) == 0:
-            self.logger.log(
+            print(
                 "[Krum] Trying to aggregate models when there is no models"
             )
             return None
@@ -216,7 +223,7 @@ class Krum(Aggregator):
             accum[layer] = torch.zeros_like(accum[layer]).to(device)
 
         # Add weighteds models
-        self.logger.log("[Krum.aggregate] Aggregating models: num={}".format(len(models)))
+        print("[Krum.aggregate] Aggregating models: num={}".format(len(models)))
 
         # Create model distance list
         total_models = len(models)
@@ -264,8 +271,8 @@ class TrimmedMean(Aggregator):
     Paper: https://arxiv.org/pdf/1803.01498.pdf
     """
 
-    def __init__(self,logger, **kwargs):
-        super().__init__(logger)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.beta = kwargs.get("beta", 0)
 
     def get_trimmedmean(self, weights):
@@ -281,7 +288,7 @@ class TrimmedMean(Aggregator):
         # check if the weight tensor has enough space
         weight_len = len(weights)
         if weight_len == 0:
-            self.logger.log(
+            print(
                 "[TrimmedMean] Trying to aggregate models when there is no models"
             )
             return None
@@ -306,15 +313,15 @@ class TrimmedMean(Aggregator):
             # largest = torch.topk(arr_weights, k=self.beta, largest=True, dim=0)
 
             # mask = torch.ones_like(arr_weights, dtype=torch.bool)
-            # self.logger.log("mask before" + str(mask) )
+            # print("mask before" + str(mask) )
             # # mask the smallest and largest elements
             # for i in range(self.beta):  
             #     mask = mask & (arr_weights != smallest.values[i])
             #     mask = mask & (arr_weights != largest.values[i])
-            # self.logger.log("mask after" + str(mask) )
+            # print("mask after" + str(mask) )
 
             # trimmed = arr_weights[mask]
-            # self.logger.log(str(trimmed))
+            # print(str(trimmed))
 
 
             sl = [slice(None)] * atmp.ndim
@@ -326,7 +333,7 @@ class TrimmedMean(Aggregator):
             res = torch.tensor(arr_median).to(device)
             # take mean of each column
             #res = torch.mean(trimmed, 0)
-            #self.logger.log('res' + str(res))
+            #print('res' + str(res))
             #print(res)
         # get the mean of the remaining weights
         return res
@@ -344,7 +351,7 @@ class TrimmedMean(Aggregator):
         """
         # Check if there are models to aggregate
         if len(models) == 0:
-            self.logger.log(
+            print(
                 "[TrimmedMean] Trying to aggregate models when there is no models"
             )
             return None
@@ -361,7 +368,7 @@ class TrimmedMean(Aggregator):
             accum[layer] = torch.zeros_like(accum[layer])
 
         # Add weighted models
-        self.logger.log("[TrimmedMean.aggregate] Aggregating models: num={}".format(len(models)))
+        print("[TrimmedMean.aggregate] Aggregating models: num={}".format(len(models)))
 
         # Calculate the trimmedmean for each parameter
         for layer in accum:

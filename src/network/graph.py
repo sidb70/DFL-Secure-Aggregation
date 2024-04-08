@@ -4,71 +4,71 @@ import bisect
 # seed
 random.seed(42)
 
-class UserGraph:
+class Graph:
     def __init__(self):
         self.nodes = {}
         self.edges = {}
-    def add_user(self, user_num, ip, port, malicious=False):
-        if user_num in self.nodes:
+    def add_node(self, node_num, ip, port, malicious=False):
+        if node_num in self.nodes:
             return
-        self.nodes[user_num] = {'ip': ip, 'port': port, 'malicious': malicious}
-        if user_num not in self.edges:
-            self.edges[user_num] = set()
+        self.nodes[node_num] = {'ip': ip, 'port': port, 'malicious': malicious}
+        if node_num not in self.edges:
+            self.edges[node_num] = set()
 
     def make_connections(self, p=1.0, directed=False):
         '''
-        Make connections between users with probability p
+        Make connections between nodes with probability p
         :param p: probability of connection
         :param directed: whether the graph is directed
         '''
-        for user1 in self.nodes:
-            for user2 in self.nodes:
-                if user1 == user2:
+        for node1 in self.nodes:
+            for node2 in self.nodes:
+                if node1 == node2:
                     continue
                 if random.random() < p:
-                    self.add_edge(user1, user2, directed=directed)
+                    self.add_edge(node1, node2, directed=directed)
                     if not directed:
-                        self.add_edge(user2, user1, directed=directed)
+                        self.add_edge(node2, node1, directed=directed)
                 else:
-                    self.remove_edge(user1, user2, directed=directed)
+                    self.remove_edge(node1, node2, directed=directed)
                     if not directed:
-                        self.remove_edge(user2, user1, directed=directed)
-    def add_edge(self, user1, user2, directed=False):
+                        self.remove_edge(node2, node1, directed=directed)
+    def add_edge(self, node1, node2, directed=False):
         '''
-        Add an edge between two users
-        :param user1: user 1
-        :param user2: user 2
+        Add an edge between two nodes
+        :param node1: node 1
+        :param node2: node 2
         :param directed: whether the graph is directed
         '''
-        if user1 in self.edges and user2 in self.edges[user1]:
+        if node1 in self.edges and node2 in self.edges[node1]:
             return
-        if user1 not in self.edges:
-            self.edges[user1] = set()
-        if user2 not in self.edges:
-            self.edges[user2] = set()
-        self.edges[user1].add(user2)
+        if node1 not in self.edges:
+            self.edges[node1] = set()
+        if node2 not in self.edges:
+            self.edges[node2] = set()
+        self.edges[node1].add(node2)
         if not directed:
-            self.edges[user2].add(user1)
-    def remove_edge(self, user1, user2, directed=False):
+            self.edges[node2].add(node1)
+    def remove_edge(self, node1, node2, directed=False):
         '''
-        Remove an edge between two users
-        :param user1: user 1
-        :param user2: user 2
+        Remove an edge between two nodes
+        :param node1: node 1
+        :param node2: node 2
         :param directed: whether the graph is directed
         '''
-        if user1 in self.edges and user2 in self.edges[user1]:
-            self.edges[user1].remove(user2)
+        if node1 in self.edges and node2 in self.edges[node1]:
+            self.edges[node1].remove(node2)
         if not directed:
-            if user2 in self.edges and user1 in self.edges[user2]:
-                self.edges[user2].remove(user1)
-    def get_neighbors(self, user):
+            if node2 in self.edges and node1 in self.edges[node2]:
+                self.edges[node2].remove(node1)
+    def get_neighbors(self, node):
         '''
-        Get the neighbors of a user
-        :param user: user
+        Get the neighbors of a node
+        :param node: node
         :return: set of neighbors
         '''
-        if user in self.edges:
-            return self.edges[user]
+        if node in self.edges:
+            return self.edges[node]
         return set()
 
     def create_random_graph(self, num_nodes, edge_density, malicious_nodes):
@@ -79,7 +79,7 @@ class UserGraph:
         '''
         for i in range(num_nodes):
             is_malicious = i in malicious_nodes
-            self.add_user(i, f'localhost', 50000+i, malicious=is_malicious)
+            self.add_node(i, f'localhost', 50000+i, malicious=is_malicious)
         self.make_connections(p=edge_density)
     def create_scale_free_graph(self, num_nodes, m0, m, malicious_nodes):
         '''
@@ -92,47 +92,41 @@ class UserGraph:
             raise ValueError("Number of nodes must be greater than m0")
         for i in range(m0):
             is_malicious = i in malicious_nodes
-            self.add_user(i, f'localhost', 50000+i, malicious=is_malicious)
+            self.add_node(i, f'localhost', 50000+i, malicious=is_malicious)
         self.make_connections(p=1.0)
         for i in range(m0, num_nodes):
             # choose m nodes to connect to
-            choices = [[node]*self.user_degree(node) for node in self.nodes]
+            choices = [[node]*self.node_degree(node) for node in self.nodes]
             choices = [item for sublist in choices for item in sublist]
 
             is_malicious = i in malicious_nodes
-            self.add_user(i, f'localhost', 50000+i, malicious=i in malicious_nodes)
+            self.add_node(i, f'localhost', 50000+i, malicious=i in malicious_nodes)
 
-            while self.user_degree(i) < m: # choose m neighbors
+            while self.node_degree(i) < m: # choose m neighbors
                 neighbor = random.choice(choices)
-                if neighbor not in self.user_edges(i):
+                if neighbor not in self.node_edges(i):
                     self.add_edge(i, neighbor)
 
-    def user_degree(self, user):
+    def node_degree(self, node):
         '''
-        Get the degree of a user
-        :param user: user
-        :return: degree of the user
+        Get the degree of a node
+        :param node: node
+        :return: degree of the node
         '''
-        return len(self.edges[user])
-    def user_edges(self, user):
-        ''' 
-        Get the edges of a user
-        :param user: user
-        :return: set of edges
-        '''
-        return self.edges[user]
+        return len(self.edges[node])
+
     def to_dict(self):
         ''' 
         Convert the graph to a dictionary
         :return: dictionary representation of the graph
         '''
         graph_dict = {}
-        for user in self.nodes.keys():
-            graph_dict[user] = {
-                "ip": self.nodes[user]['ip'],
-                "port": self.nodes[user]['port'],
-                "edges": list(self.get_neighbors(user)),
-                "malicious": self.nodes[user]['malicious']
+        for node in self.nodes.keys():
+            graph_dict[node] = {
+                "ip": self.nodes[node]['ip'],
+                "port": self.nodes[node]['port'],
+                "edges": list(self.get_neighbors(node)),
+                "malicious": self.nodes[node]['malicious']
             }
         return graph_dict
     def save(self, filename):
@@ -149,30 +143,32 @@ class UserGraph:
         '''
         with open(filename, 'r') as f:
             graph_dict = json.load(f)
-        for user, data in graph_dict.items():
-            self.add_user(user, data['ip'], data['port'], data['malicious'])
+        for node, data in graph_dict.items():
+            self.add_node(node, data['ip'], data['port'], data['malicious'])
             for edge in data['edges']:
-                self.add_edge(user, edge)
+                self.add_edge(node, edge)
 
     def __iter__(self):
         return iter(self.nodes)
     
     def __str__(self):
         out = ""
-        for user, edges in self.edges.items():
+        for node, edges in self.edges.items():
             if len(edges) == 0:
-                out += f"{user}: None\n"
+                out += f"{node}: None\n"
             else:
-                out += f"{user}: {edges}\n"
+                out += f"{node}: {edges}\n"
         return out
     def __repr__(self):
         return self.__str__()
+    def __getitem__(self, key):
+        return self.nodes[key]
     
 
 
 
 
 def create_graph():
-    graph = UserGraph()
+    graph = Graph()
     return graph
 

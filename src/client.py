@@ -10,7 +10,7 @@ import threading
 from network import listen
 from training.models.torch import loan_defaulter
 from training.models.torch.loan_defaulter import LoanDefaulter
-from training.models.torch.MNIST_model import DigitClassifier
+from training.models.torch.digit_classifier import DigitClassifier
 import torch
 from aggregation import strategies
 from attack import attacks
