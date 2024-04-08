@@ -291,7 +291,7 @@ def delete_files(exp_id, iteration):
             os.remove(file)
 def signal_handler(sig, frame):
     print('Exiting simulation')
-    delete_files()
+    delete_files(experiment_params['id'], experiment_params['iteration'])
     torch.cuda.empty_cache()
     exit(0)
 def run_simulation(params):
