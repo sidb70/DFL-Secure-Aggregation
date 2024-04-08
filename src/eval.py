@@ -15,8 +15,8 @@ experiment_id = experiment_params['id']
 experiment_desc = experiment_params['description']
 
 
-def save_results(exp_id):
-    save_dir = os.path.join('src','training','results')
+def save_results(exp_id, iteration):
+    save_dir = os.path.join('src','training','results', f'experiment_{exp_id}')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     try:
@@ -37,16 +37,17 @@ def save_results(exp_id):
                                     })
     
     # load all nodes metrics
-    node_metrics_dir = os.path.join('src','training','results','node_metrics')
+    node_metrics_dir = os.path.join('src','training','results',f'experiment_{exp_id}',f'{iteration}','node_metrics')
     avg_accuracies_by_round = [0]*experiment_params['rounds']
     avg_losses_by_round = [0]*experiment_params['rounds']
     num_benign_nodes = 0
-    for node_hash in os.listdir(node_metrics_dir):
-        with open(os.path.join(node_metrics_dir,node_hash),'r') as f:
+    for node_hash_json in os.listdir(node_metrics_dir):
+        with open(os.path.join(node_metrics_dir,node_hash_json),'r') as f:
             node_metrics = json.load(f)
         node_accuracies = node_metrics['accuracies']
         node_losses = node_metrics['losses']
         for r in range(len(node_accuracies)):
+            print(node_accuracies[r])
             avg_accuracies_by_round[r] += node_accuracies[r]
             avg_losses_by_round[r] += node_losses[r]
         num_benign_nodes += 1
@@ -61,11 +62,11 @@ def save_results(exp_id):
 
 
 
-def save_node_metrics(node_hash, accuracy, loss):
+def save_node_metrics(node_hash, accuracy, loss, exp_id, iteration):
     '''
     Save node metrics to a json file.
     '''
-    save_dir = os.path.join('src','training','results','node_metrics')
+    save_dir = os.path.join('src','training','results',f'experiment_{exp_id}',f'{iteration}','node_metrics')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     try:
@@ -87,7 +88,7 @@ def save_node_metrics(node_hash, accuracy, loss):
     print("Saved results to", os.path.join(save_dir,f'{node_hash}.json'))
 
 def make_plot(exp_id):
-    experiment_json_path = os.path.join('src','training','results',f'{exp_id}.json') 
+    experiment_json_path = os.path.join('src','training','results',f'experiment_{exp_id}', f'{exp_id}.json')
     with open(experiment_json_path,'r') as f:
         results = json.load(f)
 
@@ -104,8 +105,13 @@ def make_plot(exp_id):
     plt.legend(byzantine_proportion_legend)
     plt.xlabel('Round')
     plt.ylabel('Accuracy')
+<<<<<<< Updated upstream
     plt.title('Scale-free Network n=1024\n FedAvg Accuracy by Round')
     plt.savefig(os.path.join('src','training','results',f'{exp_id}_accuracy_by_round.png'))
+=======
+    plt.title('Accuracy by Round')
+    plt.savefig(os.path.join('src','training','results',f'experiment_{exp_id}_accuracy_by_round.png'))
+>>>>>>> Stashed changes
     plt.clf()
     # loss
     for i in range(len(results['experiments'])):
@@ -118,7 +124,7 @@ def make_plot(exp_id):
     plt.xlabel('Round')
     plt.ylabel('Loss')
     plt.title('Loss by Round')
-    plt.savefig(os.path.join('src','training','results',f'{exp_id}_loss_by_round.png'))
+    plt.savefig(os.path.join('src','training','results',f'experiment_{exp_id}_loss_by_round.png'))
     plt.clf()
 
 
@@ -226,5 +232,5 @@ def make_plot(exp_id):
 
     #plt.show()
 if __name__=='__main__':
-    save_results(999)
+    save_results(999, 0)
     make_plot(1)

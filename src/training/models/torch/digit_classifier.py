@@ -172,6 +172,8 @@ class DigitClassifier(BaseModel):
         return accuracy, loss
 
     def save_model(self, path):
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
         torch.save(self.model.state_dict(), path)
 
 if __name__ == '__main__':

@@ -44,9 +44,11 @@ class DFLTrainer:
         self.malicious_nodes = set(node_hash for node_hash in self.nodes if \
                                  self.topology[node_hash]['malicious'])
         
-        
+        self.exp_id = experiment_params['id']
+        self.exp_iteration = experiment_params['iteration']
         self.mnist_dataset = None
-        self.models_base_dir = os.path.join('src','training','models','nodes')
+        self.models_base_dir = os.path.join('src','training','models', 
+                                            f'experiment_{self.exp_id}', f'{self.exp_iteration}','nodes')
         self.current_round=0
 
         manager = Manager()
@@ -227,11 +229,12 @@ class DFLTrainer:
             metrics_dict[self.current_round]['loss'] += loss
             print(f'Node {node_hash} round {self.current_round} accuracy: {accuracy} loss: {loss}')
             # save to node metrics json
-            eval.save_node_metrics(node_hash, accuracy, loss)
+        
+            eval.save_node_metrics(node_hash, accuracy, loss, self.exp_id, self.exp_iteration)
 
     def __del__(self):
         torch.cuda.empty_cache()
-        delete_files()
+        delete_files(self.exp_id, self.exp_iteration)
 
 # ______________ Simulator ______________
 # def run_nodes(num_nodes):
@@ -267,20 +270,18 @@ class DFLTrainer:
     # for process in processes:
     #     process.wait()
     # print('All nodes finished')
-def delete_files():
+def delete_files(exp_id, iteration):
     """
     Delete files in the models and core* files
     """
-    model_dir = os.path.join('src','training','models','nodes')
-    # for each round dir
-    for round_dir in os.listdir(model_dir):
-        round_dir = os.path.join(model_dir, round_dir)
-        # delete each file in directory
-        for file in os.listdir(round_dir):
-            os.remove(os.path.join(round_dir, file))
-    node_results_dir = os.path.join('src','training','results','node_metrics')
-    for file in os.listdir(node_results_dir):
-        os.remove(os.path.join(node_results_dir, file))
+    models_dir = os.path.join('src','training','models', f'experiment_{exp_id}', f'{iteration}','nodes')
+    for file in os.listdir(models_dir):
+        os.remove(os.path.join(models_dir, file))
+
+    # remove json
+    node_metrics_dir = os.path.join('src','training','results',f'experiment_{exp_id}',f'{iteration}','node_metrics')
+    for file in os.listdir(node_metrics_dir):
+        os.remove(os.path.join(node_metrics_dir, file))
 
     # remove core files
     
@@ -351,8 +352,9 @@ def run_simulation(params):
     dfl_trainer.run()
 
     exp_id = params['id']
+    iteration = params['iteration']
 
-    eval.save_results(exp_id)
+    eval.save_results(exp_id, iteration)
     eval.make_plot(exp_id)
     delete_files()
 
