@@ -104,7 +104,7 @@ class Graph:
 
             while self.node_degree(i) < m: # choose m neighbors
                 neighbor = random.choice(choices)
-                if neighbor not in self.node_edges(i):
+                if neighbor not in self.get_neighbors(i):
                     self.add_edge(i, neighbor)
 
     def node_degree(self, node):

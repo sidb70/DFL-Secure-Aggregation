@@ -117,6 +117,7 @@ class DFLTrainer:
                          evaluating=False)
         if self.current_round>0:
             # load model in current round dir (aggregated from previous round)
+            #print(os.listdir(os.path.join(self.models_base_dir, f'round_{self.current_round}')))
             model.load_model(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'))
     
         start_index = (node_hash*self.num_samples)% len(self.mnist_dataset)
@@ -132,8 +133,12 @@ class DFLTrainer:
         print('\nAggregating models')
 
         # malicious nodes should aggregate first
-        for idx in range(0, len(self.malicious_nodes), self.num_workers):
-            worker_hashes = [num for num in self.malicious_nodes[idx:idx+self.num_workers] if num<len(self.malicious_nodes)]
+        for idx in range(0, len(self.nodes), self.num_workers):
+            worker_hashes = [num for num in self.nodes[idx:idx+self.num_workers] \
+                             if num<len(self.nodes) and num in self.malicious_nodes]
+            if len(worker_hashes)==0:
+                continue
+            
             print("Malicous worker hashes: ", worker_hashes)
             processes = []
             for worker in worker_hashes:
@@ -145,6 +150,9 @@ class DFLTrainer:
         for idx in range(0, len(self.nodes), self.num_workers):
             worker_hashes = [num for num in self.nodes[idx:idx+self.num_workers] \
                              if num<len(self.nodes) and num not in self.malicious_nodes]
+            if len(worker_hashes)==0:
+                continue
+
             print("Benign worker hashes: ", worker_hashes)
             processes = []
             for worker in worker_hashes:
