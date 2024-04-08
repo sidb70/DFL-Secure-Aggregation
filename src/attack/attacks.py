@@ -35,10 +35,10 @@ class Noise():
         :param received_weights: A dictionary containing the received weights.
         Returns A dictionary containing the noise injected weights.
         """
-        print("[NoiseInjectionAttack] Performing noise injection attack")
+        #print("[NoiseInjectionAttack] Performing noise injection attack")
         lkeys = list(model.keys())
         for k in lkeys:
-            print(f"Layer noised: {k}")
+            #print(f"Layer noised: {k}")
             # adding noise with mu =0, sigma=1 * strength
             model[k] = model[k].to(device)
             model[k].data += torch.randn(model[k].shape).to(device) * self.strength 

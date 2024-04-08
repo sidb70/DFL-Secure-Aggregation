@@ -134,7 +134,7 @@ class Median(Aggregator):
             median = torch.tensor(arr_median,device=device)
         return median
 
-    def aggregate(self, models):
+    def aggregate(self, model_paths):
         """
         For each jth model parameter, the master device sorts the jth parameters of
         the m local models and takes the median as the jth parameter
@@ -142,28 +142,30 @@ class Median(Aggregator):
         median is the mean of the middle two parameters.
 
         Args:
-            models: Dictionary with the models (node: model,num_samples).
+            model_paths: List of model paths
         """
         # Check if there are models to aggregate
-        if len(models) == 0:
+        if len(model_paths) == 0:
             print(
                                "[Median] Trying to aggregate models when there is no models"
             )
             return None
 
-        models_params = [m for m, _ in models]
+ 
 
-        total_models = len(models)
+        total_models = len(model_paths)
 
-        # Create a Zero Model
-        accum = (models[-1][0]).copy()
-        for layer in accum:
-            accum[layer] = torch.zeros_like(accum[layer]).to(device)
+        accum = None
+
 
         # Add weighteds models
-        print("[Median.aggregate] Aggregating models: num={}".format(len(models)))
+        print("[Median.aggregate] Aggregating models: num={}".format(len(model_paths)))
 
-        # Calculate the trimmedmean for each parameter
+        model = torch.load(model_paths[0], map_location=device)
+        accum = {layer: torch.zeros_like(param).to(device) for layer, param in model.items()}
+ 
+
+            
         for layer in accum:
             weight_layer = accum[layer].to(device)
             # get the shape of layer tensor
@@ -173,7 +175,7 @@ class Median(Aggregator):
             number_layer_weights = torch.numel(weight_layer)
             # if its 0-d tensor
             if l_shape == []:
-                weights = torch.tensor([models_params[j][layer].to(device) for j in range(0, total_models)]).to(device)
+                weights = torch.tensor([torch.load(model_paths[j])[layer] for j in range(0, total_models)])
                 weights = weights.double()
                 w = self.get_median(weights)
                 accum[layer] = w
@@ -183,11 +185,13 @@ class Median(Aggregator):
                 weight_layer_flatten = weight_layer.view(number_layer_weights)
 
                 # flatten the tensor of each model put all on the same device
-                models_layer_weight_flatten = torch.stack([models_params[j][layer].to(device).view(number_layer_weights) for j in range(0, total_models)], 0)
-                
+                #models_layer_weight_flatten = torch.stack([models_params[j][layer].to(device).view(number_layer_weights) for j in range(0, total_models)], 0)
+                models_layer_weight_flatten = torch.stack([torch.load(model_paths[j])[layer].to(device).view(number_layer_weights) for j in range(0, total_models)], 0)
                 # get the weight list [w1j,w2j,··· ,wmj], where wij is the jth parameter of the ith local model
                 median = self.get_median(models_layer_weight_flatten)
                 accum[layer] = median.view(l_shape)
+
+
         return accum
 class Krum(Aggregator):
     """
@@ -198,35 +202,31 @@ class Krum(Aggregator):
     def __init__(self,  **kwargs):
         super().__init__( **kwargs)
 
-    def aggregate(self, models):
+    def aggregate(self, model_paths):
         """
         Krum selects one of the m local models that is similar to other models
         as the global model, the euclidean distance between two local models is used.
 
         Args:
-            models: Dictionary with the models (node: model,num_samples).
+            model_paths: List of model paths
         """
         # Check if there are models to aggregate
-        if len(models) == 0:
+        if len(model_paths) == 0:
             print(
                 "[Krum] Trying to aggregate models when there is no models"
             )
             return None
 
 
-        # Total Samples
-        total_samples = sum([y for _, y in models])
-
         # Create a Zero Model
-        accum = copy.deepcopy(models[-1][0])
-        for layer in accum:
-            accum[layer] = torch.zeros_like(accum[layer]).to(device)
+        model = torch.load(model_paths[0], map_location=device)
+        accum = {layer: torch.zeros_like(param).to(device) for layer, param in model.items()}
 
         # Add weighteds models
-        print("[Krum.aggregate] Aggregating models: num={}".format(len(models)))
+        print("[Krum.aggregate] Aggregating models: num={}".format(len(model_paths)))
 
         # Create model distance list
-        total_models = len(models)
+        total_models = len(model_paths)
         distance_list = [0 for i in range(0, total_models)]
 
         # Calculate the L2 Norm between xi and xj
@@ -234,9 +234,9 @@ class Krum(Aggregator):
         min_distance_sum = float('inf')
 
         for i in range(0, total_models):
-            m1, _ = models[i]
+            m1 = torch.load(model_paths[i], map_location=device)
             for j in range(0, total_models):
-                m2, _ = models[j]
+                m2 = torch.load(model_paths[j], map_location=device)
                 distance = 0
                 if i == j:
                     distance = 0
@@ -257,7 +257,7 @@ class Krum(Aggregator):
 
         
         # Assign the model with min distance with others as the aggregated model
-        m, _ = models[min_index]
+        m = torch.load(model_paths[min_index], map_location=device)
         for layer in m:
             accum[layer]=accum[layer].to(device)
             accum[layer] = accum[layer] + m[layer].to(device)
