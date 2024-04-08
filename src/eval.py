@@ -104,7 +104,7 @@ def make_plot(exp_id):
     plt.legend(byzantine_proportion_legend)
     plt.xlabel('Round')
     plt.ylabel('Accuracy')
-    plt.title('Accuracy by Round')
+    plt.title('Scale-free Network n=1024\n FedAvg Accuracy by Round')
     plt.savefig(os.path.join('src','training','results',f'{exp_id}_accuracy_by_round.png'))
     plt.clf()
     # loss

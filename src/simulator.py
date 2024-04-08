@@ -41,8 +41,8 @@ class DFLTrainer:
         self.attack_method = attack_method
 
         self.nodes = list(range(self.num_nodes))
-        self. malicious_nodes = [node_hash for node_hash in self.nodes if \
-                                 self.topology[node_hash]['malicious']]
+        self.malicious_nodes = set(node_hash for node_hash in self.nodes if \
+                                 self.topology[node_hash]['malicious'])
         
         
         self.mnist_dataset = None
@@ -78,6 +78,13 @@ class DFLTrainer:
                 os.makedirs(os.path.join(self.models_base_dir, f'round_{self.current_round}'))
             self.train_network()
             self.aggregate_network()
+
+            # delete files from current round
+            if self.current_round>0:
+                prev_dir = os.path.join(self.models_base_dir, f'round_{self.current_round-1}')
+                for file in os.listdir(prev_dir):
+                    os.remove(os.path.join(prev_dir, file))
+
             self.current_round+=1
     def run_tasks(self, processes):
         for p in processes:
@@ -135,7 +142,7 @@ class DFLTrainer:
         # malicious nodes should aggregate first
         for idx in range(0, len(self.nodes), self.num_workers):
             worker_hashes = [num for num in self.nodes[idx:idx+self.num_workers] \
-                             if num<len(self.nodes) and num in self.malicious_nodes]
+                                if num<len(self.nodes) and num in self.malicious_nodes]
             if len(worker_hashes)==0:
                 continue
             
