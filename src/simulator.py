@@ -275,13 +275,14 @@ def delete_files(exp_id, iteration):
     Delete files in the models and core* files
     """
     models_dir = os.path.join('src','training','models', f'experiment_{exp_id}', f'{iteration}','nodes')
-    for file in os.listdir(models_dir):
-        os.remove(os.path.join(models_dir, file))
+    for round_dir in os.listdir(models_dir):
+        for file in os.listdir(os.path.join(models_dir, round_dir)):
+            os.remove(os.path.join(models_dir, round_dir, file))
 
     # remove json
-    node_metrics_dir = os.path.join('src','training','results',f'experiment_{exp_id}',f'{iteration}','node_metrics')
-    for file in os.listdir(node_metrics_dir):
-        os.remove(os.path.join(node_metrics_dir, file))
+    # node_metrics_dir = os.path.join('src','training','results',f'experiment_{exp_id}',f'{iteration}','node_metrics')
+    # for file in os.listdir(node_metrics_dir):
+    #     os.remove(os.path.join(node_metrics_dir, file))
 
     # remove core files
     
@@ -356,7 +357,7 @@ def run_simulation(params):
 
     eval.save_results(exp_id, iteration)
     eval.make_plot(exp_id)
-    delete_files()
+
 
 
 if __name__=='__main__':
