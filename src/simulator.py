@@ -193,11 +193,13 @@ class DFLTrainer:
         else:
             model_paths = [os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{neighbor}.pt')\
                            for neighbor in neighbors if not self.topology[neighbor]['malicious']]
-
-        aggregator = strategies.create_aggregator(node_hash)
-        aggregated_model = aggregator.aggregate(model_paths)
-        print("Node ", node_hash, "aggregation complete")
-
+        if (not is_malicous and len(model_paths)>1) or (is_malicous and len(model_paths)>0):
+            aggregator = strategies.create_aggregator(node_hash)
+            aggregated_model = aggregator.aggregate(model_paths)
+            print("Node ", node_hash, "aggregation complete")
+        else:
+            # use current model
+            aggregated_model = torch.load(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'))
         # load model
         model = DigitClassifier(epochs=self.epochs_per_round, batch_size=self.batch_size, num_samples=self.num_samples,
                             node_hash=node_hash, evaluating=True)

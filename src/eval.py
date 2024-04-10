@@ -1,8 +1,5 @@
 import torch
 import os
-from training.models.torch.loan_defaulter import LoanDefaulter
-from training.models.torch.digit_classifier import DigitClassifier
-from aggregation.strategies import FedAvg
 import yaml
 import json
 import matplotlib.pyplot as plt
@@ -46,10 +43,10 @@ def save_results(exp_id, iteration):
             node_metrics = json.load(f)
         node_accuracies = node_metrics['accuracies']
         node_losses = node_metrics['losses']
-        for r in range(len(node_accuracies)):
-            print(node_accuracies[r])
-            avg_accuracies_by_round[r] += node_accuracies[r]
-            avg_losses_by_round[r] += node_losses[r]
+        for r in range(30):
+            print(len(node_accuracies),r)
+            avg_accuracies_by_round[r] += node_accuracies[-30:][r]
+            avg_losses_by_round[r] += node_losses[-30:][r]
         num_benign_nodes += 1
 
         
@@ -97,7 +94,7 @@ def make_plot(exp_id):
     for i in range(len(results['experiments'])):
         accuracies_by_round = results['experiments'][i]['accuracies_by_round']
         experiment_params = results['experiments'][i]['params']
-        byzantine_proportion = experiment_params['malicious_proportion']
+        byzantine_proportion = results['experiments'][i]['params']['malicious_proportion']
         byzantine_proportion_legend.append(str(byzantine_proportion*100) + '% Byzantine')
 
         plt.plot(range(1,len(accuracies_by_round)+1), accuracies_by_round, label=f'Byzantine Proportion: {byzantine_proportion}')
@@ -105,7 +102,7 @@ def make_plot(exp_id):
     plt.legend(byzantine_proportion_legend)
     plt.xlabel('Round')
     plt.ylabel('Accuracy')
-    plt.title('Scale-free Network n=1024\n FedAvg Accuracy by Round')
+    plt.title('Scale-free Network n=128\n Median Accuracy by Round')
     plt.savefig(os.path.join('src','training','results',f'{exp_id}_accuracy_by_round.png'))
 
     plt.clf()
@@ -113,13 +110,18 @@ def make_plot(exp_id):
     for i in range(len(results['experiments'])):
         losses_by_round = results['experiments'][i]['loss_by_round']
         experiment_params = results['experiments'][i]['params']
-        byzantine_proportion = experiment_params['malicious_proportion']
-        plt.plot(range(1,len(losses_by_round)+1), losses_by_round, label=f'Byzantine Proportion: {byzantine_proportion}')
+        byzantine_proportion = results['experiments'][i]['params']['malicious_proportion']
+        trimmed_losses = [min(l,5) for l in losses_by_round]
+        byzantine_proportion_legend.append(str(byzantine_proportion*100) + '% Byzantine')
+
+        plt.plot(range(1,len(trimmed_losses)+1), trimmed_losses, label=f'Byzantine Proportion: {byzantine_proportion}')
 
     plt.legend(byzantine_proportion_legend)
     plt.xlabel('Round')
     plt.ylabel('Loss')
-    plt.title('Loss by Round')
+    # crop y axis to 0-2
+    plt.ylim(0,5.1)
+    plt.title('Scale-free Network n=128\n Krum Loss by Round')
     plt.savefig(os.path.join('src','training','results',f'experiment_{exp_id}_loss_by_round.png'))
     plt.clf()
 
@@ -228,5 +230,5 @@ def make_plot(exp_id):
 
     #plt.show()
 if __name__=='__main__':
-    save_results(999, 0)
-    make_plot(1)
+    #save_results(1, 2)
+    make_plot(2)
