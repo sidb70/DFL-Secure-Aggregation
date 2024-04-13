@@ -29,7 +29,7 @@ with open(experiment_yaml) as f:
 
 class DFLTrainer:
     def __init__(self, num_nodes, topology, num_workers, num_rounds, epochs_per_round, batch_size,
-                 num_samples, aggregation_method, attack_method):
+                 num_samples, aggregation_method, attack_method, exp_id=experiment_params['id'], exp_iteration=experiment_params['iteration']):
         self.num_nodes = num_nodes
         self.topology = topology
         self.num_workers = num_workers
@@ -44,8 +44,10 @@ class DFLTrainer:
         self.malicious_nodes = set(node_hash for node_hash in self.nodes if \
                                  self.topology[node_hash]['malicious'])
         
-        self.exp_id = experiment_params['id']
-        self.exp_iteration = experiment_params['iteration']
+        self.exp_id = exp_id
+        self.exp_iteration = exp_iteration
+        
+        
         self.mnist_dataset = None
         self.models_base_dir = os.path.join('src','training','models', 
                                             f'experiment_{self.exp_id}', f'{self.exp_iteration}','nodes')
@@ -169,7 +171,7 @@ class DFLTrainer:
                 processes.append(p)
             self.run_tasks(processes)
 
-        time.sleep(2)
+        time.sleep(.5)
         
 
     
@@ -296,6 +298,7 @@ def signal_handler(sig, frame):
     delete_files(experiment_params['id'], experiment_params['iteration'])
     torch.cuda.empty_cache()
     exit(0)
+
 def run_simulation(params):
     """
     Runs the simulation with the experiment arguments.
@@ -315,10 +318,8 @@ def run_simulation(params):
     num_nodes = params['nodes']
     malicious_proportion = params['malicious_proportion']
     exp_id = params['id']
-
+    topology = graph.Graph()
     if not params['use_saved_topology']:
-        #### create network graph
-        topology = graph.create_graph()
         print(f'Created topology with {num_nodes} nodes')
         malicous_nodes = random.sample(range(num_nodes), int(malicious_proportion*num_nodes))
         print("Malicious nodes: ", malicous_nodes)
@@ -330,6 +331,10 @@ def run_simulation(params):
             m0=experiment_params['m0']
             m=experiment_params['m']
             topology.create_scale_free_graph(num_nodes, m0, m, malicous_nodes)
+        elif experiment_params['topology']=='small-world':
+            k=experiment_params['k']
+            b=experiment_params['b']
+            topology.create_small_world_graph(num_nodes, k, b, malicous_nodes)
         else:
             raise ValueError('Invalid topology: must be random, small-world, or scale-free')
 
@@ -337,6 +342,7 @@ def run_simulation(params):
         # save topology
         topology.save(os.path.join(os.getcwd(), 'src','config','topology.json'))
     else:
+        topology.load(os.path.join(os.getcwd(), 'src','config','topology.json'))
         print('Using saved topology')
 
     # processes = run_nodes(num_nodes)
@@ -350,14 +356,12 @@ def run_simulation(params):
                              epochs_per_round=params['epochs_per_round'], batch_size=params['batch_size'], num_samples=params['num_samples'],
                              aggregation_method=params['aggregation'], attack_method=params['attack_type'])
 
-    
+
+
     dfl_trainer.load_data()
     dfl_trainer.run()
 
-    exp_id = params['id']
-    iteration = params['iteration']
-
-    eval.save_results(exp_id, iteration)
+    eval.save_results(experiment_params)
     eval.make_plot(exp_id)
 
 

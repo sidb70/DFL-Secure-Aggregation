@@ -81,6 +81,30 @@ class Graph:
             is_malicious = i in malicious_nodes
             self.add_node(i, f'localhost', 50000+i, malicious=is_malicious)
         self.make_connections(p=edge_density)
+    def create_small_world_graph(self, num_nodes, k, b, malicious_nodes):
+        '''
+        Create a small world graph using the Watts-Strogatz model
+        num_nodes: number of nodes in the graph
+        k: number of nearest neighbors to connect
+        b: probability of rewiring
+        '''
+
+        for i in range(num_nodes):
+            is_malicious = i in malicious_nodes
+            self.add_node(i, f'localhost', 6000+i, malicious=is_malicious)
+        
+        for node1 in range(num_nodes):
+            for node2 in range(node1 + 1, node1 + k//2 + 1):
+                #if random.random() < pC:
+                self.add_edge(node1, node2 % num_nodes)
+        # rewiring
+        for node1 in range(num_nodes):
+            neighbors = list(self.get_neighbors(node1))
+            for neighbor in neighbors:
+                if random.random() < b:
+                    new_neighbor = random.choice([node for node in range(num_nodes) if node != node1 and node not in neighbors])
+                    self.add_edge(node1, new_neighbor)
+                    self.remove_edge(node1, neighbor)
     def create_scale_free_graph(self, num_nodes, m0, m, malicious_nodes):
         '''
         create a scale free graph using the Barabasi-Albert model
@@ -94,13 +118,19 @@ class Graph:
             is_malicious = i in malicious_nodes
             self.add_node(i, f'localhost', 50000+i, malicious=is_malicious)
         self.make_connections(p=1.0)
+        remaining_malicious = len(malicious_nodes) - m0
         for i in range(m0, num_nodes):
             # choose m nodes to connect to
             choices = [[node]*self.node_degree(node) for node in self.nodes]
             choices = [item for sublist in choices for item in sublist]
 
+            # if i in malicious_nodes and remaining_malicious<1:
+            #     is_malicious = False
+            # else:
             is_malicious = i in malicious_nodes
-            self.add_node(i, f'localhost', 50000+i, malicious=i in malicious_nodes)
+            # remaining_malicious -= 1
+        
+            self.add_node(i, f'localhost', 50000+i, malicious=is_malicious)
 
             while self.node_degree(i) < m: # choose m neighbors
                 neighbor = random.choice(choices)
@@ -144,9 +174,9 @@ class Graph:
         with open(filename, 'r') as f:
             graph_dict = json.load(f)
         for node, data in graph_dict.items():
-            self.add_node(node, data['ip'], data['port'], data['malicious'])
+            self.add_node(int(node), data['ip'], int(data['port']), bool(data['malicious']))
             for edge in data['edges']:
-                self.add_edge(node, edge)
+                self.add_edge(int(node), int(edge))
 
     def __iter__(self):
         return iter(self.nodes)
@@ -158,6 +188,7 @@ class Graph:
                 out += f"{node}: None\n"
             else:
                 out += f"{node}: {edges}\n"
+            out+= f"malicious: {self.nodes[node]['malicious']}\n"
         return out
     def __repr__(self):
         return self.__str__()
@@ -172,3 +203,54 @@ def create_graph():
     graph = Graph()
     return graph
 
+
+if __name__== '__main__':
+    graph = Graph()
+    # initial_malicious = [0,1,2,3,4,5]
+    # remaining_malicious = [10 + 2*i for i in range(33)]
+    # graph.create_scale_free_graph(num_nodes=128, m0=10, m=5,
+    #                               malicious_nodes=initial_malicious+remaining_malicious)
+    # graph.save('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
+    # save
+    #graph.load('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
+    
+    graph.create_small_world_graph(num_nodes=128, k=8, b=0.2, malicious_nodes=[])
+    print(graph)
+    rewires = set()
+    for node in range(len(graph.nodes)):
+        neighbors = graph.get_neighbors(node)
+        for neighbor in neighbors:
+            # if neighbor is a rewired
+            if abs(node - neighbor) > 10 and neighbor not in rewires:
+                rewires.add(node)
+                break   
+                #graph.nodes[node]['malicious'] = False
+
+    # graph.save('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
+    
+    # print(graph)
+  
+    #nium malicous nodes
+    #randomly choose 38 nodes out of rewires
+    rewires = list(rewires)
+    random.shuffle(rewires)
+    rewires = rewires[:38]
+    for node in rewires:
+        graph.nodes[node]['malicious'] = True
+
+    honest_to_malicous_connections = 0
+    total_honest_connections = 0
+    for node in graph.nodes:
+        if graph.nodes[node]['malicious']:
+            for neighbor in graph.get_neighbors(node):
+                if not graph.nodes[neighbor]['malicious']:
+                    honest_to_malicous_connections += 1
+        else:
+            for neighbor in graph.get_neighbors(node):
+                if not graph.nodes[neighbor]['malicious']:
+                    total_honest_connections += 1
+                
+    print(honest_to_malicous_connections)
+    print(total_honest_connections)
+
+    graph.save('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
