@@ -324,7 +324,7 @@ def run_simulation(params):
     num_nodes = params['nodes']
     malicious_proportion = params['malicious_proportion']
     exp_id = params['id']
-    topology = graph.Graph()
+    topology = graph.Topology()
     if not params['use_saved_topology']:
         print(f'Created topology with {num_nodes} nodes')
         malicous_nodes = random.sample(range(num_nodes), int(malicious_proportion*num_nodes))
@@ -333,14 +333,13 @@ def run_simulation(params):
         if experiment_params['topology']=='random':
             edge_density = params['edge_density']
             topology.create_random_graph(num_nodes, edge_density, malicous_nodes)
-        elif experiment_params['topology']=='scale-free':
-            m0=experiment_params['m0']
-            m=experiment_params['m']
-            topology.create_scale_free_graph(num_nodes, m0, m, malicous_nodes)
         elif experiment_params['topology']=='small-world':
-            k=experiment_params['k']
-            b=experiment_params['b']
-            topology.create_small_world_graph(num_nodes, k, b, malicous_nodes)
+            k = params['small_world_k']
+            p = params['small_world_beta']
+            topology.create_small_world_graph(num_nodes, k, p, malicous_nodes)
+        elif experiment_params['topology']=='scale-free':
+            m = params['scale_free_m']
+            topology.create_scale_free_graph(num_nodes, m,malicous_nodes)
         else:
             raise ValueError('Invalid topology: must be random, small-world, or scale-free')
 
