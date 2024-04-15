@@ -3,20 +3,18 @@ from logger import Logger
 from skimage.util import random_noise
 from collections import OrderedDict
 import copy
+import math
 
 device=None
 class SignFlip:
     def __init__(self, attack_args: dict):
         # flipped model will go in opposite direction as the normally trained model
         self.flipped_model = None
-    def attack(self, model: OrderedDict, prev_model: OrderedDict):
-        if not self.flipped_model:
-            self.flipped_model = copy.deepcopy(prev_model)
+    def attack(self, model: OrderedDict):
         print("[SignFlippingAttack]")
-        for layer in prev_model:
-            print(f"[SignFlippingAttack] Flipping layer {layer}")
-            self.flipped_model[layer] += -1*(model[layer]-prev_model[layer])
-        return self.flipped_model
+        for k in model:
+            model[k] = -model[k]
+        return model
 
 class Noise():
     """
@@ -59,11 +57,56 @@ class RandomNoise():
         lkeys = list(random_model.keys())
         for k in lkeys:
             #print(f"Layer noised: {k}")
-            # adding noise with mu =0, sigma=1 * strength
+            # adding noise with mu =strength, sigma=1 * strength
             random_model[k] = torch.randn(random_model[k].shape).to(device) * self.strength
         return random_model
-    
 
+class ALittleIsEnough:
+    def __init__(self, attack_args: dict):
+        '''
+        https://github.com/lishenghui/blades/blob/master/blades/adversaries/alie_adversary.py
+        '''
+        print(f"[ALIE] Initialized with args {attack_args}")
+        num_nodes = attack_args['nodes']
+        num_byz = attack_args['byzantine']
+
+        #s = torch.floor_divide(num_nodes, 2) + 1 - num_byz 
+        # torch.floor_divide is deprecated. use torch.div 
+        s = torch.div(num_nodes, 2, rounding_mode='trunc') + 1 - num_byz
+        cdf_value = (num_nodes - num_byz - s) / (num_nodes - num_byz)
+        dist = torch.distributions.normal.Normal(torch.tensor(0.0), torch.tensor(1.0))
+        self.z_max = dist.icdf(cdf_value)
+    def attack(self, model_paths: list):
+        '''
+        ALIE attack on the model paths
+        
+        Args:
+            model_paths: list of model paths
+            
+        Returns:
+            poisoned_model: poisoned model
+        '''
+        # get mean of model and std of models
+        poisoned_model = None
+        std_model = None
+        for model_path in model_paths:
+            model = torch.load(model_path, map_location=device)
+            if poisoned_model is None:
+                poisoned_model = {name: torch.zeros_like(param).to(device) for name, param in model.items()}
+                std_model = {name: torch.zeros_like(param).to(device) for name, param in model.items()}
+            
+            for layer in model:
+                poisoned_model[layer] += model[layer].to(device)
+                std_model[layer] += model[layer].to(device)**2
+
+        for layer in poisoned_model:
+            poisoned_model[layer] /= len(model_paths)
+            std_model[layer] = torch.sqrt(std_model[layer]/len(model_paths) - poisoned_model[layer]**2)
+
+            poisoned_model[layer] += std_model[layer] * self.z_max
+        print("[ALIE] Poisoned model")
+        return poisoned_model
+      
 # class InnerProductAttack:
 #     """
 #     Function to perform inner product attack on the received weights.
@@ -115,6 +158,7 @@ def create_attacker(attack_type, attack_args, node_hash):
     global device
     num_gpus = torch.cuda.device_count()
     device = 'cuda:' + str(node_hash % num_gpus) if num_gpus > 0 else 'cpu'
+    attack_type = attack_type.lower()
     if attack_type == 'noise':
         return Noise(attack_args)
     # elif attack_type == 'innerproduct':
@@ -123,5 +167,7 @@ def create_attacker(attack_type, attack_args, node_hash):
         return SignFlip(attack_args)
     elif attack_type=='randomnoise':
         return RandomNoise(attack_args)
+    elif attack_type =='alie':
+        return ALittleIsEnough(attack_args)
     else:
         raise ValueError(f'Unknown attack type: {attack_type}')

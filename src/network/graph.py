@@ -204,18 +204,24 @@ def create_graph():
     return graph
 
 
+import math
 if __name__== '__main__':
     graph = Graph()
-    # initial_malicious = [0,1,2,3,4,5]
-    # remaining_malicious = [10 + 2*i for i in range(33)]
+
+    # malicious_proportion = 0.1
+    # selection_set = list(range(int(math.ceil(2*malicious_proportion*128))))
+    # initial_malicious = random.sample(selection_set, math.ceil(len(selection_set)/2))
+    # print(initial_malicious)
+    # print(len(initial_malicious))
+    # remaining_malicious = []
+    # #remaining_malicious = [10 + 2*i for i in range(33)]
     # graph.create_scale_free_graph(num_nodes=128, m0=10, m=5,
-    #                               malicious_nodes=initial_malicious+remaining_malicious)
-    # graph.save('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
-    # save
-    #graph.load('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
+    #                               malicious_nodes=initial_malicious)
     
-    graph.create_small_world_graph(num_nodes=128, k=8, b=0.2, malicious_nodes=[])
-    print(graph)
+    # .graph.load('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
+    
+    beta = .05
+    graph.create_small_world_graph(num_nodes=128, k=8, b=beta, malicious_nodes=[])
     rewires = set()
     for node in range(len(graph.nodes)):
         neighbors = graph.get_neighbors(node)
@@ -223,20 +229,8 @@ if __name__== '__main__':
             # if neighbor is a rewired
             if abs(node - neighbor) > 10 and neighbor not in rewires:
                 rewires.add(node)
+                graph.nodes[node]['malicious'] = True
                 break   
-                #graph.nodes[node]['malicious'] = False
-
-    # graph.save('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
-    
-    # print(graph)
-  
-    #nium malicous nodes
-    #randomly choose 38 nodes out of rewires
-    rewires = list(rewires)
-    random.shuffle(rewires)
-    rewires = rewires[:38]
-    for node in rewires:
-        graph.nodes[node]['malicious'] = True
 
     honest_to_malicous_connections = 0
     total_honest_connections = 0
@@ -249,8 +243,12 @@ if __name__== '__main__':
             for neighbor in graph.get_neighbors(node):
                 if not graph.nodes[neighbor]['malicious']:
                     total_honest_connections += 1
-                
+
+    print("num malicious",sum([1 for node in graph.nodes if graph.nodes[node]['malicious']]))
+    #print(graph)
     print(honest_to_malicous_connections)
     print(total_honest_connections)
 
     graph.save('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
+
+    

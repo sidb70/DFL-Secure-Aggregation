@@ -15,6 +15,7 @@ import signal
 from training.models.torch.digit_classifier import DigitClassifier, BaseModel
 from training.models.torch.digit_classifier import load_data as MNIST_load_data
 from aggregation import strategies
+import math
 import time
 from attack import attacks
 # seed
@@ -215,11 +216,16 @@ class DFLTrainer:
         # if malicious, dont evaluate. Instead, attack the model
         if self.topology[node_hash]['malicious']:
             #attacker
-            attack_type =experiment_params['attack_type']
+            attack_type =experiment_params['attack_type'].lower()
             attack_args = experiment_params['attack_args']
-            attack_args['defense'] = experiment_params['aggregation']
+            attack_args['defense'] = experiment_params['aggregation'].lower()
+            attack_args['nodes'] = self.num_nodes
+            attack_args['byzantine'] = math.ceil(experiment_params['malicious_proportion'] * self.num_nodes)
             attacker = attacks.create_attacker(attack_type, attack_args, node_hash)
-            poisoned_model = attacker.attack(model.model.state_dict())
+            if attack_type=='alie':
+                poisoned_model = attacker.attack(model_paths)
+            else:
+                poisoned_model = attacker.attack(model.model.state_dict())
             #save the model in current round dir
             model.model.load_state_dict(poisoned_model)
             model.save_model(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'))

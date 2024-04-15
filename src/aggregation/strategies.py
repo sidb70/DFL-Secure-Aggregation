@@ -1,7 +1,4 @@
-'''
-Source: https://github.com/enriquetomasmb/fedstellar/blob/main/fedstellar/learning/aggregators
-Modified under the GNU General Public License v3.0
-'''
+
 import torch
 import numpy as np
 import copy
@@ -36,6 +33,8 @@ def create_aggregator(node_hash):
         return Krum()
     elif aggregator_type == 'trimmedmean':
         return TrimmedMean(beta=int(experiment_params['beta']))
+    elif aggregator_type == 'geomed':
+        return GeoMed()
     else:
         raise ValueError(f"Aggregator type {aggregator_type} not recognized")
 class Aggregator:
@@ -43,6 +42,8 @@ class Aggregator:
         self.kwargs = kwargs
 class FedAvg(Aggregator):
     """
+    Source: https://github.com/enriquetomasmb/fedstellar/blob/main/fedstellar/learning/aggregators
+    
     Federated Averaging (FedAvg) [McMahan et al., 2016]
     Paper: https://arxiv.org/abs/1602.05629
     """
@@ -90,6 +91,8 @@ class FedAvg(Aggregator):
         return accum
 class Median(Aggregator):
     """
+    Source: https://github.com/enriquetomasmb/fedstellar/blob/main/fedstellar/learning/aggregators
+    
     Median [Dong Yin et al., 2021]
     Paper: https://arxiv.org/pdf/1803.01498.pdf
     """
@@ -195,6 +198,8 @@ class Median(Aggregator):
         return accum
 class Krum(Aggregator):
     """
+    Source: https://github.com/enriquetomasmb/fedstellar/blob/main/fedstellar/learning/aggregators
+    
     Krum [Peva Blanchard et al., 2017]
     Paper: https://papers.nips.cc/paper/2017/hash/f4b9ec30ad9f68f89b29639786cb62ef-Abstract.html
     """
@@ -267,6 +272,8 @@ class Krum(Aggregator):
 
 class TrimmedMean(Aggregator):
     """
+    Source: https://github.com/lishenghui/blades/blob/master/blades/aggregators/aggregators.py
+
     TrimmedMean [Dong Yin et al., 2021]
     Paper: https://arxiv.org/pdf/1803.01498.pdf
     """
@@ -274,128 +281,96 @@ class TrimmedMean(Aggregator):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.beta = kwargs.get("beta", 0)
+        self.num_byz = kwargs.get("byzantine", 0)
+        self.num_excluded = int(self.beta * self.num_byz )
+    def aggregate(self, model_paths):
 
-    def get_trimmedmean(self, weights):
-        """
-        For weight list [w1j,w2j,··· ,wmj], removes the largest and
-        smallest β of them, and computes the mean of the remaining
-        m-2β parameters
-
-        Args:
-            weights: weights list, 2D tensor
-        """
-
-        # check if the weight tensor has enough space
-        weight_len = len(weights)
-        if weight_len == 0:
-            print(
-                "[TrimmedMean] Trying to aggregate models when there is no models"
-            )
-            return None
-
-        if weight_len <= 2 * self.beta:
-            # logging.error(
-            #     "[TrimmedMean] Number of model should larger than 2 * beta"
-            # )
-            remaining_wrights = weights
-            res = torch.mean(remaining_wrights, 0)
-
-        else:
-            # remove the largest and smallest β items
-            arr_weights = torch.asarray(weights).cpu().numpy()
-            # sort the tensor
-            arr_weights = np.sort(arr_weights, axis=0)
-            nobs = arr_weights.shape[0] # number of observations
-            start = self.beta
-            end = nobs - self.beta
-            atmp = np.partition(arr_weights, (start, end - 1), 0)
-            # smallest = torch.topk(arr_weights, k=(self.beta), largest=False, dim=0)
-            # largest = torch.topk(arr_weights, k=self.beta, largest=True, dim=0)
-
-            # mask = torch.ones_like(arr_weights, dtype=torch.bool)
-            # print("mask before" + str(mask) )
-            # # mask the smallest and largest elements
-            # for i in range(self.beta):  
-            #     mask = mask & (arr_weights != smallest.values[i])
-            #     mask = mask & (arr_weights != largest.values[i])
-            # print("mask after" + str(mask) )
-
-            # trimmed = arr_weights[mask]
-            # print(str(trimmed))
-
-
-            sl = [slice(None)] * atmp.ndim
-            sl[0] = slice(start, end)
-            # print num of remaining weights after trimming
-            #print(len(atmp[tuple(sl)]))
-            #print(atmp[tuple(sl)])
-            arr_median = np.mean(atmp[tuple(sl)], axis=0)
-            res = torch.tensor(arr_median).to(device)
-            # take mean of each column
-            #res = torch.mean(trimmed, 0)
-            #print('res' + str(res))
-            #print(res)
-        # get the mean of the remaining weights
-        return res
-
-    def aggregate(self, models):
-        """
-        For each jth model parameter, the master device sorts the jth parameters
-        of the m local models, i.e., w1j,w2j,··· ,wmj, where wij is the
-        jth parameter of the ith local model, removes the largest and
-        smallest β of them, and computes the mean of the remaining
-        m-2β parameters as the jth parameter of the global model.
-
-        Args:
-            models: List of models (node: model, num_samples).
-        """
         # Check if there are models to aggregate
-        if len(models) == 0:
+        if len(model_paths) == 0:
             print(
                 "[TrimmedMean] Trying to aggregate models when there is no models"
             )
             return None
+        
+        # Add weighteds models
+        print("[TrimmedMean.aggregate] Aggregating models: num={}".format(len(model_paths)))
+        num_models = len(model_paths)
+        model = torch.load(model_paths[0], map_location=device)
+        inputs = {layer: [] for layer in model}
+        for model_path in model_paths:
+            model = torch.load(model_path, map_location=device)
+            for layer in model:
+                inputs[layer].append(model[layer])
+        for layer in inputs:
+            # stack all the layers of each model
+            inputs[layer] = torch.stack(inputs[layer], 0)
 
-        models_params = [m for m, _ in models]
+            # calculate the trimmed mean
+            largest, _ = torch.topk(inputs[layer], self.num_excluded, 0)
+            neg_smallest, _ = torch.topk(-inputs[layer], self.num_excluded, 0)
+            new_stacked = torch.cat([inputs[layer], -largest, neg_smallest]).sum(0)
+            new_stacked /= num_models - 2 * self.num_excluded
+            inputs[layer] = new_stacked
+        return inputs
+class GeoMed:
+    '''
+    Source: https://github.com/lishenghui/blades/blob/master/blades/aggregators/aggregators.py
+    '''
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.maxiter = kwargs.get("maxiter", 100)
+        self.eps= kwargs.get("eps", 1e-6)
+        self.ftol = kwargs.get("ftol", 1e-10)
 
-        # Total Samples
-        total_samples = sum([y for _, y in models])
-        total_models = len(models)
+    def aggregate(self, model_paths):
+        # Check if there are models to aggregate
+        if len(model_paths) == 0:
+            print(
+                "[GeoMed] Trying to aggregate models when there is no models"
+            )
+            return None
 
-        # Create a Zero Model
-        accum = (models[-1][0]).copy()
-        for layer in accum:
-            accum[layer] = torch.zeros_like(accum[layer])
+        # Add weighteds models
+        print("[GeoMed.aggregate] Aggregating models: num={}".format(len(model_paths)))
+        num_models = len(model_paths)
+        model = torch.load(model_paths[0], map_location=device)
+        inputs = {layer: [] for layer in model}
+        for model_path in model_paths:
+            model = torch.load(model_path, map_location=device)
+            for layer in model:
+                inputs[layer].append(model[layer])
+        for layer in inputs:
+            # stack all the layers of each model
+            inputs[layer] = torch.stack(inputs[layer], 0)
+            weights = torch.ones(num_models, device=device)
+            def weighted_average(inps, w):
+                # match size on singleton dimensions
+                w = w.view(-1, *([1] * (inps.ndim - 1)))
+                return torch.sum(inps * w, 0) / torch.sum(w)
 
-        # Add weighted models
-        print("[TrimmedMean.aggregate] Aggregating models: num={}".format(len(models)))
 
-        # Calculate the trimmedmean for each parameter
-        for layer in accum:
-            weight_layer = accum[layer]
-            # get the shape of layer tensor
-            l_shape = list(weight_layer.shape)
+            def obj_func(median, inp, weights):
 
-            # get the number of elements of layer tensor
-            number_layer_weights = torch.numel(weight_layer)
-            # if its 0-d tensor
-            if l_shape == []:
-                weights = torch.tensor([models_params[j][layer] for j in range(0, total_models)])
-                weights = weights.double()
-                w = self.get_trimmedmean(weights)
-                accum[layer] = w
+                return np.average(
+                    [torch.norm(p - median).item() for p in inp],
+                    weights=weights.cpu(),
+                )
+            with torch.no_grad():
+                median = weighted_average(inputs[layer], weights)
+                new_weights = weights
+                objective_value = obj_func(median, inputs[layer], weights)
 
-            else:
-                # flatten the tensor
-                weight_layer_flatten = weight_layer.view(number_layer_weights)
+                # Weiszfeld iterations
+                for _ in range(self.maxiter):
+                    prev_obj_value = objective_value
+                    denom = torch.stack([torch.norm(p - median) for p in inputs[layer]])
+                    new_weights = weights / torch.clamp(denom, min=self.eps)
+                    median = weighted_average(inputs[layer], new_weights)
 
-                # flatten the tensor of each model
-                models_layer_weight_flatten = torch.stack([models_params[j][layer].view(number_layer_weights) for j in range(0, total_models)], 0)
+                    objective_value = obj_func(median, inputs[layer], weights)
+                    if abs(prev_obj_value - objective_value) <= self.ftol * objective_value:
+                        break
 
-                # get the weight list [w1j,w2j,··· ,wmj], where wij is the jth parameter of the ith local model
-                trimmedmean = self.get_trimmedmean(models_layer_weight_flatten)
-                #print(l_shape)
-                #print(trimmedmean.shape)
-                accum[layer] = trimmedmean.view(l_shape)
-
-        return accum
+                median = weighted_average(inputs[layer], new_weights)
+                inputs[layer] = median
+        return inputs
