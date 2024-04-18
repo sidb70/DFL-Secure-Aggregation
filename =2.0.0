@@ -1,6 +1,0 @@
-Collecting torch
-  Downloading torch-1.10.2-cp36-cp36m-manylinux1_x86_64.whl (881.9 MB)
-Requirement already satisfied: dataclasses in ./venv/lib/python3.6/site-packages (from torch) (0.8)
-Requirement already satisfied: typing-extensions in ./venv/lib/python3.6/site-packages (from torch) (4.1.1)
-Installing collected packages: torch
-Successfully installed torch-1.10.2
