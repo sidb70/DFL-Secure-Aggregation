@@ -7,7 +7,6 @@ from multiprocessing import Manager
 import os
 import random
 import yaml
-import logging
 import eval
 import torch
 from torch.utils.data import Subset
@@ -15,7 +14,6 @@ import signal
 from training.models.torch.digit_classifier import DigitClassifier, BaseModel
 from training.models.torch.digit_classifier import load_data as MNIST_load_data
 from aggregation import strategies
-import math
 import time
 from attack import attacks
 # seed

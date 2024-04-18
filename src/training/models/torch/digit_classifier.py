@@ -3,7 +3,6 @@ from .Model import BaseModel
 import matplotlib.pyplot as plt
 # import tensorflow as tf
 # from tensorflow.keras import layers, Sequential
-import logging
 import numpy as np
 import torch
 from torch import nn

@@ -1,5 +1,4 @@
 import torch
-from logger import Logger
 from skimage.util import random_noise
 from collections import OrderedDict
 import copy
