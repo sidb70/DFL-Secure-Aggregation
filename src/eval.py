@@ -4,7 +4,6 @@ import json
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-
 def save_results(experiment_params):
     exp_id = experiment_params['id']
     iteration = experiment_params['iteration']
@@ -95,7 +94,7 @@ def make_plot(exp_id):
         experiment_params = results['experiments'][i]['params']
         #byzantine_proportion = results['experiments'][i]['params']['malicious_proportion']
         #byzantine_proportion_legend.append(str(byzantine_proportion*100) + '% Byzantine')
-        topology = results['experiments'][i]['params']['topology']
+        topology = results['experiments'][i]['params']['iteration']
         byzantine_proportion_legend.append(topology)
 
         plt.plot(range(1,len(accuracies_by_round)+1), accuracies_by_round, label=topology)
@@ -114,7 +113,7 @@ def make_plot(exp_id):
         byzantine_proportion = results['experiments'][i]['params']['malicious_proportion']
         trimmed_losses = [min(l,5) for l in losses_by_round]
         #byzantine_proportion_legend.append(str(byzantine_proportion*100) + '% Byzantine')
-        topology = results['experiments'][i]['params']['topology']
+        topology = results['experiments'][i]['params']['iteration']
         byzantine_proportion_legend.append(topology)
 
         plt.plot(range(1,len(trimmed_losses)+1), trimmed_losses, label=topology)
@@ -237,7 +236,7 @@ if __name__=='__main__':
     # save_results(3,1)
     # save_results(3,2)
     #
-    make_plot(6)
+    make_plot(10)
 
     # json_path = '/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/training/results/experiment_3/2/node_metrics'
     # # average all accuracies and losses for each round

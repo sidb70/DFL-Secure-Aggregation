@@ -33,7 +33,7 @@ class Noise():
         :param received_weights: A dictionary containing the received weights.
         Returns A dictionary containing the noise injected weights.
         """
-        #print("[NoiseInjectionAttack] Performing noise injection attack")
+        print("[NoiseInjectionAttack] Performing noise injection attack")
         lkeys = list(model.keys())
         for k in lkeys:
             #print(f"Layer noised: {k}")
@@ -52,7 +52,7 @@ class RandomNoise():
         print(f"[NoiseInjectionAttack] Initialized with strength: {self.strength}")
 
     def attack(self, model: OrderedDict):
-        #print("[NoiseInjectionAttack] Performing noise injection attack")
+        print("[NoiseInjectionAttack] Performing noise injection attack")
         random_model = copy.deepcopy(model)
         lkeys = list(random_model.keys())
         for k in lkeys:

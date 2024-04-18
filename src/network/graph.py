@@ -237,13 +237,16 @@ class Topology(networkx.Graph):
                     continue
                 if random.random() < edge_density:
                     self.add_edge(node1, node2)
+        
     def create_small_world_graph(self, num_nodes, k, b, malicious_nodes = []):
         ws = networkx.watts_strogatz_graph(num_nodes, k, b)
         self.load_from_graph(ws)
+        self.set_malicous(malicious_nodes)
 
     def create_scale_free_graph(self, num_nodes, m, malicious_nodes = []):
         ba = networkx.barabasi_albert_graph(n=num_nodes, m=m)
         self.load_from_graph(ba)
+        self.set_malicous(malicious_nodes)
 
     def save(self, filename):
         # save as json
@@ -260,24 +263,22 @@ class Topology(networkx.Graph):
         for link in data['links']:
             self.add_edge(link['source'], link['target'])
 
-    def set_malicous(self, node):
-        self.nodes[node]['malicious'] = True
+    def set_malicous(self, nodes):
+        for node in nodes:
+            self.nodes[node]['malicious'] = True
     
     def __getitem__(self, key):
         return self.nodes[key]
 import math
 if __name__== '__main__':
     topology = Topology()
+    malicious_proportion = 0.15
+    num_malicious = int(math.ceil(128*malicious_proportion))
+    topology.create_scale_free_graph(num_nodes=128, m=10)
+    sorted_nodes_by_deg = sorted(topology.nodes, key=lambda x: topology.degree(x), reverse=True)
+    malicious_nodes = sorted_nodes_by_deg[:num_malicious]
+    topology.set_malicous(malicious_nodes)
 
-    # malicious_proportion = 0.1
-    # selection_set = list(range(int(math.ceil(2*malicious_proportion*128))))
-    # initial_malicious = random.sample(selection_set, math.ceil(len(selection_set)/2))
-    # print(initial_malicious)
-    # print(len(initial_malicious))
-    # remaining_malicious = []
-    # #remaining_malicious = [10 + 2*i for i in range(33)]
-    # graph.create_scale_free_graph(num_nodes=128, m0=10, m=5,
-    #                               malicious_nodes=initial_malicious)
     
     # .graph.load('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
     
@@ -298,34 +299,34 @@ if __name__== '__main__':
     k=10
     #ws_graph = networkx.watts_strogatz_graph(128, k, beta)
     #ba_graph = networkx.barabasi_albert_graph(n=128, m=5)
-    topology.create_small_world_graph(128, k, beta)
-    #topology.load('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
+    # topology.create_small_world_graph(128, k, beta)
+    # #topology.load('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
 
-    # get all rewires
-    rewires = set()
-    for node in topology.nodes:
-        neighbors = topology.get_neighbors(node)
-        for neighbor in neighbors:
-            edge = (node, neighbor) if node < neighbor else (neighbor, node)
-            if abs(node - neighbor) > k and edge not in rewires:
-                rewires.add(edge)
-                topology.set_malicous(node)
+    # # get all rewires
+    # rewires = set()
+    # for node in topology.nodes:
+    #     neighbors = topology.get_neighbors(node)
+    #     for neighbor in neighbors:
+    #         edge = (node, neighbor) if node < neighbor else (neighbor, node)
+    #         if abs(node - neighbor) > k and edge not in rewires:
+    #             rewires.add(edge)
+    #             topology.set_malicous(node)
 
-    all_edges = set()
-    total_rewires=0
-    total_poisoned_rewires=0
-    for node in topology.nodes:
-        neighbors = topology.get_neighbors(node)
-        for neighbor in neighbors:
-            edge = (node, neighbor) if node < neighbor else (neighbor, node)
-            if abs(node - neighbor) > k and edge not in all_edges:
-                total_rewires += 1
-                if topology.nodes[node]['malicious'] or topology.nodes[neighbor]['malicious']:
-                    total_poisoned_rewires += 1
-            all_edges.add(edge)
-    print("total rewires",total_rewires)
-    print("total poisoned rewires",total_poisoned_rewires)
-    print("total edges",len(all_edges))
+    # all_edges = set()
+    # total_rewires=0
+    # total_poisoned_rewires=0
+    # for node in topology.nodes:
+    #     neighbors = topology.get_neighbors(node)
+    #     for neighbor in neighbors:
+    #         edge = (node, neighbor) if node < neighbor else (neighbor, node)
+    #         if abs(node - neighbor) > k and edge not in all_edges:
+    #             total_rewires += 1
+    #             if topology.nodes[node]['malicious'] or topology.nodes[neighbor]['malicious']:
+    #                 total_poisoned_rewires += 1
+    #         all_edges.add(edge)
+    # print("total rewires",total_rewires)
+    # print("total poisoned rewires",total_poisoned_rewires)
+    # print("total edges",len(all_edges))
     honest_to_malicous_connections = 0
     total_honest_connections = 0
     for node in topology.nodes:
@@ -348,17 +349,16 @@ if __name__== '__main__':
 
     
  
-    G = networkx.Graph()
-    for node in topology.nodes:
-        G.add_node(node)
-    for node in topology.nodes:
-        for neighbor in topology.get_neighbors(node):
-            G.add_edge(node, neighbor)
     # draw as ring lattice
-    pos = networkx.circular_layout(G)
+    #pos = networkx.circular_layout(topology)
     # spacing
-    # 4k resolution
-    fig, ax = plt.subplots(figsize=(10, 10))
-    networkx.draw(G, pos, with_labels=False, node_size=20, node_color=['r' if topology.nodes[node]['malicious'] else 'b' for node in topology.nodes])
+
+    pos = networkx.spring_layout(topology, k=0.2, iterations=100)
+    fig, ax = plt.subplots(figsize=(25, 25))
+    #edge_colors = ['red' if topology.nodes[node]['malicious'] or topology.nodes[neighbor]['malicious'] else 'blue' for node, neighbor in topology.edges]
+    networkx.draw(topology, pos, with_labels=False, node_size=20, 
+                  node_color=['r' if topology.nodes[node]['malicious'] else 'b' for node in topology.nodes],
+                  ax=ax)
     
+                  
     plt.savefig('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.png')

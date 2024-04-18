@@ -197,7 +197,10 @@ class DFLTrainer:
             model_paths = [os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{neighbor}.pt')\
                            for neighbor in neighbors if not self.topology[neighbor]['malicious']]
         if (not is_malicous and len(model_paths)>1) or (is_malicous and len(model_paths)>0):
-            aggregator = strategies.create_aggregator(node_hash)
+            agg_args = {'f': len(model_paths), 
+                        'm': len([neighbor for neighbor in neighbors if self.topology[neighbor]['malicious']]),
+                        'trimmed_mean_beta': experiment_params['trimmed_mean_beta'],}
+            aggregator = strategies.create_aggregator(node_hash, agg_args)
             aggregated_model = aggregator.aggregate(model_paths)
             print("Node ", node_hash, "aggregation complete")
         else:
@@ -219,8 +222,9 @@ class DFLTrainer:
             attack_type =experiment_params['attack_type'].lower()
             attack_args = experiment_params['attack_args']
             attack_args['defense'] = experiment_params['aggregation'].lower()
-            attack_args['nodes'] = self.num_nodes
-            attack_args['byzantine'] = math.ceil(experiment_params['malicious_proportion'] * self.num_nodes)
+            neighbors = self.topology.get_neighbors(node_hash)
+            attack_args['nodes'] = len(neighbors)
+            attack_args['malicious_nodes'] = len([neighbor for neighbor in neighbors if self.topology[neighbor]['malicious']])
             attacker = attacks.create_attacker(attack_type, attack_args, node_hash)
             if attack_type=='alie':
                 poisoned_model = attacker.attack(model_paths)
@@ -325,6 +329,7 @@ def run_simulation(params):
     malicious_proportion = params['malicious_proportion']
     exp_id = params['id']
     topology = graph.Topology()
+    topology_file = experiment_params['topology_file']
     if not params['use_saved_topology']:
         print(f'Created topology with {num_nodes} nodes')
         malicous_nodes = random.sample(range(num_nodes), int(malicious_proportion*num_nodes))
@@ -345,9 +350,9 @@ def run_simulation(params):
 
 
         # save topology
-        topology.save(os.path.join(os.getcwd(), 'src','config','topology.json'))
+        topology.save(topology_file)
     else:
-        topology.load(os.path.join(os.getcwd(), 'src','config','topology.json'))
+        topology.load(topology_file)
         print('Using saved topology')
 
     # processes = run_nodes(num_nodes)
