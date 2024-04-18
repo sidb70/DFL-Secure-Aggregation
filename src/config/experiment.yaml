@@ -1,0 +1,39 @@
+id: 9999
+iteration: 9999
+description: "Scale-free 0.15 hubs poison median"
+use_saved_topology: true # if true, the topology will be loaded from the saved file
+topology_file: '/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json'
+# fl settings
+nodes: 128
+num_workers: 16
+rounds: 30
+synchronous: true # if true, nodes will wait for all neighbors to finish before starting the next round
+
+# topology
+topology: 'scale-free'
+
+## for small world topology
+small_world_k: 10 # number of neighbors to connect to for small world topology
+small_world_beta: 0.1 # probability of rewiring for small world topology
+
+scale_free_m: 10 # degree of each new node for scale free topology
+
+# for random topology
+edge_density: 1.0 # fully connected for random topology
+
+# attacker settings
+malicious_proportion: 0.15 # proportion of malicious nodes
+attack_type: "noise"
+attack_args: {'strength': 10}
+
+# aggregator settings
+aggregation: "median"
+trimmed_mean_beta: .2 # for trimmed mean, beta is the number of weights to be trimmed from each side of the sorted array
+
+# model settings
+model_name: "digit_classifier"
+data_path: "src/training/data/loan_data.csv"
+num_samples: 250
+epochs_per_round: 2 # number of epochs of local training per round
+batch_size: 32 # batch size for local training
+

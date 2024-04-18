@@ -1,7 +1,10 @@
 PyYAML
 torch
+torchvision
 pandas
 scikit-learn
 scikit-image
 matplotlib
 requests
+networkx
+pyyaml
