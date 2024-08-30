@@ -231,12 +231,18 @@ class Topology(networkx.Graph):
         for i in range(num_nodes):
             is_malicious = i in malicious_nodes
             self.add_node(i, malicious=is_malicious)
+        
         for node1 in range(num_nodes):
-            for node2 in range(num_nodes):
-                if node1 == node2:
-                    continue
-                if random.random() < edge_density:
-                    self.add_edge(node1, node2)
+            total_deg = math.ceil(int(edge_density*num_nodes))
+            total_deg -= len(self.get_neighbors(node1))
+            connections = set(self.get_neighbors(node1))
+            while len(connections) < total_deg:
+                node2 = random.randint(0, num_nodes-1)
+                if node2 != node1 and node2 not in connections:
+                    connections.add(node2)
+            for node2 in connections:
+                self.add_edge(node1, node2)
+            print(len(self.get_neighbors(node1)))
         
     def create_small_world_graph(self, num_nodes, k, b, malicious_nodes = []):
         ws = networkx.watts_strogatz_graph(num_nodes, k, b)
@@ -271,13 +277,19 @@ class Topology(networkx.Graph):
         return self.nodes[key]
 import math
 if __name__== '__main__':
+    n=128
     topology = Topology()
-    malicious_proportion = 0.15
-    num_malicious = int(math.ceil(128*malicious_proportion))
-    topology.create_scale_free_graph(num_nodes=128, m=10)
-    sorted_nodes_by_deg = sorted(topology.nodes, key=lambda x: topology.degree(x), reverse=True)
-    malicious_nodes = sorted_nodes_by_deg[:num_malicious]
-    topology.set_malicous(malicious_nodes)
+    # malicious_proportion = 0.6
+    # num_malicious = int(math.ceil(128*malicious_proportion))
+
+    # malicious_nodes = random.sample(range(128), num_malicious)
+    # # topology.create_random_graph(num_nodes=128, edge_density=0.15, malicious_nodes=malicious_nodes)
+
+
+    # topology.create_scale_free_graph(num_nodes=128, m=10)
+    # #sorted_nodes_by_deg = sorted(topology.nodes, key=lambda x: topology.degree(x), reverse=True)
+    # #malicious_nodes = sorted_nodes_by_deg[:num_malicious]
+    # topology.set_malicous(malicious_nodes)
 
     
     # .graph.load('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
@@ -295,22 +307,26 @@ if __name__== '__main__':
     
     #ngraph = networkx.Graph()
 
-    beta = .1
+    beta = .15
     k=10
-    #ws_graph = networkx.watts_strogatz_graph(128, k, beta)
-    #ba_graph = networkx.barabasi_albert_graph(n=128, m=5)
-    # topology.create_small_world_graph(128, k, beta)
-    # #topology.load('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
+    topology.create_small_world_graph(n, k, beta)
+    #topology.set_malicous(malicious_nodes)
+    #topology.load('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
 
-    # # get all rewires
-    # rewires = set()
-    # for node in topology.nodes:
-    #     neighbors = topology.get_neighbors(node)
-    #     for neighbor in neighbors:
-    #         edge = (node, neighbor) if node < neighbor else (neighbor, node)
-    #         if abs(node - neighbor) > k and edge not in rewires:
-    #             rewires.add(edge)
-    #             topology.set_malicous(node)
+    # get all rewires
+    rewires = set()
+    malicious=[]
+    for node in topology.nodes:
+        neighbors = topology.get_neighbors(node)
+        for neighbor in neighbors:
+            edge = (node, neighbor) if node < neighbor else (neighbor, node)
+            if abs(node%n - neighbor%n) > k and edge not in rewires:
+                rewires.add(edge)
+                malicious.append(node)
+                break
+    topology.set_malicous(malicious)
+    print(malicious)
+    print(len(malicious))
 
     # all_edges = set()
     # total_rewires=0
@@ -327,34 +343,31 @@ if __name__== '__main__':
     # print("total rewires",total_rewires)
     # print("total poisoned rewires",total_poisoned_rewires)
     # print("total edges",len(all_edges))
-    honest_to_malicous_connections = 0
-    total_honest_connections = 0
-    for node in topology.nodes:
-        if topology.nodes[node]['malicious']:
-            for neighbor in topology.get_neighbors(node):
-                if not topology.nodes[neighbor]['malicious']:
-                    honest_to_malicous_connections += 1
-        else:
-            for neighbor in topology.get_neighbors(node):
-                if not topology.nodes[neighbor]['malicious']:
-                    total_honest_connections += 1
+    # honest_to_malicous_connections = 0
+    # total_honest_connections = 0
+    # for node in topology.nodes:
+    #     if topology.nodes[node]['malicious']:
+    #         for neighbor in topology.get_neighbors(node):
+    #             if not topology.nodes[neighbor]['malicious']:
+    #                 honest_to_malicous_connections += 1
+    #     else:
+    #         for neighbor in topology.get_neighbors(node):
+    #             if not topology.nodes[neighbor]['malicious']:
+    #                 total_honest_connections += 1
 
-    print("num malicious",sum([1 for node in topology.nodes if topology.nodes[node]['malicious']]))
+    # print("num malicious",sum([1 for node in topology.nodes if topology.nodes[node]['malicious']]))
+    # #print(graph)
+    # print(honest_to_malicous_connections)
+    # print(total_honest_connections)
+
+    # topology.save('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
     #print(graph)
-    print(honest_to_malicous_connections)
-    print(total_honest_connections)
-
-    topology.save('/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json')
-    #print(graph)
-
     
- 
+    #print(topology.get_neighbors(25))
     # draw as ring lattice
-    #pos = networkx.circular_layout(topology)
-    # spacing
-
-    pos = networkx.spring_layout(topology, k=0.2, iterations=100)
-    fig, ax = plt.subplots(figsize=(25, 25))
+    pos = networkx.circular_layout(topology)
+    #pos = networkx.spring_layout(topology, k=0.2, iterations=100)
+    fig, ax = plt.subplots(figsize=(10, 10))
     #edge_colors = ['red' if topology.nodes[node]['malicious'] or topology.nodes[neighbor]['malicious'] else 'blue' for node, neighbor in topology.edges]
     networkx.draw(topology, pos, with_labels=False, node_size=20, 
                   node_color=['r' if topology.nodes[node]['malicious'] else 'b' for node in topology.nodes],

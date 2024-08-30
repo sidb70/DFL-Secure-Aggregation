@@ -1,6 +1,6 @@
-id: 9999
-iteration: 9999
-description: "Scale-free 0.15 hubs poison median"
+id: 12
+iteration: 5
+description: "scale-free geomed 0.6 malicious"
 use_saved_topology: true # if true, the topology will be loaded from the saved file
 topology_file: '/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json'
 # fl settings
@@ -22,12 +22,12 @@ scale_free_m: 10 # degree of each new node for scale free topology
 edge_density: 1.0 # fully connected for random topology
 
 # attacker settings
-malicious_proportion: 0.15 # proportion of malicious nodes
+malicious_proportion: 0.6 # proportion of malicious nodes
 attack_type: "noise"
 attack_args: {'strength': 10}
 
 # aggregator settings
-aggregation: "median"
+aggregation: "geomed"
 trimmed_mean_beta: .2 # for trimmed mean, beta is the number of weights to be trimmed from each side of the sorted array
 
 # model settings

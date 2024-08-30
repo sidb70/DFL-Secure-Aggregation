@@ -87,45 +87,49 @@ def make_plot(exp_id):
     with open(experiment_json_path,'r') as f:
         results = json.load(f)
 
-    byzantine_proportion_legend = []
     print(len(results['experiments']))
+    line_type = { 'scale-free': '-', 'small-world': '--'}
+    line_color = {0.0: 'green', 0.3: 'blue', 0.6: 'red'}
     for i in range(len(results['experiments'])):
         accuracies_by_round = results['experiments'][i]['accuracies_by_round']
         experiment_params = results['experiments'][i]['params']
-        #byzantine_proportion = results['experiments'][i]['params']['malicious_proportion']
-        #byzantine_proportion_legend.append(str(byzantine_proportion*100) + '% Byzantine')
-        topology = results['experiments'][i]['params']['iteration']
-        byzantine_proportion_legend.append(topology)
+        byzantine_proportion = results['experiments'][i]['params']['malicious_proportion']
+        topology = results['experiments'][i]['params']['topology']
+        plt.plot(range(1,len(accuracies_by_round)+1), accuracies_by_round, label=f'{topology} {byzantine_proportion*100}% Byzantine', linestyle=line_type[topology], color=line_color[byzantine_proportion])
+    # legend for line type and color
+    # for key in line_type:
+    #     plt.plot([],[],label=key, linestyle=line_type[key], color='black')
+    # for key in line_color:
+    #     plt.plot([],[],label=f'{key*100}%', color=line_color[key])
 
-        plt.plot(range(1,len(accuracies_by_round)+1), accuracies_by_round, label=topology)
-    
-    plt.legend(byzantine_proportion_legend)
+    plt.legend()
+
     plt.xlabel('Round')
     plt.ylabel('Accuracy')
-    plt.title('Strategic Byzantine Node Placement n=128, 30% Byzantine\n Krum Accuracy by Round')
+    plt.title('GeoMed Accuracy by Round \nRandom Byzantine Placement')
     plt.savefig(os.path.join('src','training','results',f'{exp_id}_accuracy_by_round.png'))
 
     plt.clf()
     # loss
-    for i in range(len(results['experiments'])):
-        losses_by_round = results['experiments'][i]['loss_by_round']
-        experiment_params = results['experiments'][i]['params']
-        byzantine_proportion = results['experiments'][i]['params']['malicious_proportion']
-        trimmed_losses = [min(l,5) for l in losses_by_round]
-        #byzantine_proportion_legend.append(str(byzantine_proportion*100) + '% Byzantine')
-        topology = results['experiments'][i]['params']['iteration']
-        byzantine_proportion_legend.append(topology)
+    # for i in range(len(results['experiments'])):
+    #     losses_by_round = results['experiments'][i]['loss_by_round']
+    #     experiment_params = results['experiments'][i]['params']
+    #     byzantine_proportion = results['experiments'][i]['params']['malicious_proportion']
+    #     trimmed_losses = [min(l,5) for l in losses_by_round]
+    #     #byzantine_proportion_legend.append(str(byzantine_proportion*100) + '% Byzantine')
+    #     topology = results['experiments'][i]['params']['iteration']
+    #     byzantine_proportion_legend.append(topology)
 
-        plt.plot(range(1,len(trimmed_losses)+1), trimmed_losses, label=topology)
+    #     plt.plot(range(1,len(trimmed_losses)+1), trimmed_losses, label=topology)
 
-    plt.legend(byzantine_proportion_legend)
-    plt.xlabel('Round')
-    plt.ylabel('Loss')
-    # crop y axis to 0-2
-    plt.ylim(0,5.1)
-    plt.title('Strategic Byzantine Node Placement n=128\n Krum Loss by Round')
-    plt.savefig(os.path.join('src','training','results',f'experiment_{exp_id}_loss_by_round.png'))
-    plt.clf()
+    # plt.legend(byzantine_proportion_legend)
+    # plt.xlabel('Round')
+    # plt.ylabel('Loss')
+    # # crop y axis to 0-2
+    # plt.ylim(0,5.1)
+    # plt.title('Strategic Byzantine Node Placement n=128\n Krum Loss by Round')
+    # plt.savefig(os.path.join('src','training','results',f'experiment_{exp_id}_loss_by_round.png'))
+    # plt.clf()
 
 
 # def eval_global_model(dataset):
@@ -236,7 +240,7 @@ if __name__=='__main__':
     # save_results(3,1)
     # save_results(3,2)
     #
-    make_plot(10)
+    make_plot(12)
 
     # json_path = '/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/training/results/experiment_3/2/node_metrics'
     # # average all accuracies and losses for each round
