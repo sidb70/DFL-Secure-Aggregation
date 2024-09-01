@@ -1,88 +1,12 @@
 
 from .Model import BaseModel
-import matplotlib.pyplot as plt
-# import tensorflow as tf
-# from tensorflow.keras import layers, Sequential
-import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader, Subset
-import datetime
+from torch.utils.data import DataLoader
 import os
 
-# class DigitClassifierTensorFlow(BaseModel):
-#     def __init__(self, epochs: int, batch_size: int, num_samples: int, node_hash: int, logger: logging.Logger):
-#         super().__init__(num_samples, node_hash, epochs, batch_size)
-#         self.logger = logger
-#         self.losses = {'train': [], 'validation': []}
-#         self.load_data()
-#         self.build_model()
-
-#     def load_data(self):
-#         (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
-
-#         np.random.seed(self.node_hash)
-#         permutation = np.random.permutation(x_train.shape[0])
-#         x_train, y_train = x_train[permutation], y_train[permutation]
-
-#         if self.num_samples > 0:
-#             x_train, y_train = x_train[:self.num_samples], y_train[:self.num_samples]
-
-#         x_train, x_test = x_train / 255.0, x_test / 255.0
-#         x_train = x_train[..., tf.newaxis]
-#         x_test = x_test[..., tf.newaxis]
-
-#         self.train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(10000,
-#                                                                                        seed=self.node_hash).batch(
-#             self.batch_size)
-#         self.val_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(self.batch_size)
-
-#         AUTOTUNE = tf.data.AUTOTUNE
-#         self.train_ds = self.train_ds.cache().prefetch(buffer_size=AUTOTUNE)
-#         self.val_ds = self.val_ds.cache().prefetch(buffer_size=AUTOTUNE)
-
-#     def build_model(self):
-#         self.model = Sequential([
-#             layers.Rescaling(1. / 255, input_shape=(28, 28, 1)),
-#             layers.Conv2D(16, 3, padding='same', activation='relu'),
-#             layers.MaxPooling2D(),
-#             layers.Conv2D(32, 3, padding='same', activation='relu'),
-#             layers.MaxPooling2D(),
-#             layers.Conv2D(64, 3, padding='same', activation='relu'),
-#             layers.MaxPooling2D(),
-#             layers.Flatten(),
-#             layers.Dense(128, activation='relu'),
-#             layers.Dense(10)
-#         ])
-
-#         self.model.compile(optimizer='adam',
-#                            loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-#                            metrics=['accuracy'])
-
-#     def train(self):
-#         history = self.model.fit(
-#             self.train_ds,
-#             validation_data=self.val_ds,
-#             epochs=self.epochs
-#         )
-
-#         self.losses['train'] = history.history['loss']
-#         self.losses['validation'] = history.history['val_loss']
-
-#         self.logger.info('Training complete')
-
-#     def plot_losses(self):
-#         epochs_range = range(self.epochs)
-
-#         plt.figure(figsize=(8, 8))
-#         plt.subplot(1, 2, 1)
-#         plt.plot(epochs_range, self.losses['train'], label='Training Loss')
-#         plt.plot(epochs_range, self.losses['validation'], label='Validation Loss')
-#         plt.legend(loc='upper right')
-#         plt.title('Training and Validation Loss')
-#         plt.show()
 def load_data():
     mnist_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
     mnist_dataset = datasets.MNIST(root='data', train=True, transform=mnist_transform, download=True)
@@ -124,7 +48,7 @@ class DigitClassifier(BaseModel):
  
         self.model = Net().to(self.device)
     def load_model(self, path):
-        self.model.load_state_dict(torch.load(path))
+        self.model.load_state_dict(torch.load(path, weights_only=True))
 
     def train(self, subset_dataset):
         X_train = DataLoader(subset_dataset, batch_size=self.batch_size, shuffle=True)

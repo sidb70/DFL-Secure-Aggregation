@@ -1,10 +1,10 @@
-id: 12
-iteration: 5
-description: "scale-free geomed 0.6 malicious"
-use_saved_topology: true # if true, the topology will be loaded from the saved file
+id: 999
+iteration: 0
+description: "testing trimmedmean"
+use_saved_topology: false # if true, the topology will be loaded from the saved file
 topology_file: '/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topology.json'
 # fl settings
-nodes: 128
+nodes: 20
 num_workers: 16
 rounds: 30
 synchronous: true # if true, nodes will wait for all neighbors to finish before starting the next round
@@ -27,8 +27,8 @@ attack_type: "noise"
 attack_args: {'strength': 10}
 
 # aggregator settings
-aggregation: "geomed"
-trimmed_mean_beta: .2 # for trimmed mean, beta is the number of weights to be trimmed from each side of the sorted array
+aggregation: "trimmedmean"
+trimmed_mean_beta: .2 # for trimmed mean, beta is the proportion of weights to be trimmed from each side of the sorted array
 
 # model settings
 model_name: "digit_classifier"

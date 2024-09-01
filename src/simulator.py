@@ -137,7 +137,9 @@ class DFLTrainer:
         model.train(subset_dataset)
     
         # save model in current round dir
-        model.save_model(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'))
+        filename = os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt')
+        model.save_model(filename)
+        print("Saved model for node ", node_hash, "to", filename)
     def aggregate_network(self):
         # save model in round+1 dir
         print('\nAggregating models')
@@ -203,7 +205,7 @@ class DFLTrainer:
             print("Node ", node_hash, "aggregation complete")
         else:
             # use current model
-            aggregated_model = torch.load(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'))
+            aggregated_model = torch.load(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'), weights_only=True)
         # load model
         model = DigitClassifier(epochs=self.epochs_per_round, batch_size=self.batch_size, num_samples=self.num_samples,
                             node_hash=node_hash, evaluating=True)
