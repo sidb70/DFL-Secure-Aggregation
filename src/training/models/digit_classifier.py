@@ -1,5 +1,5 @@
 
-from .Model import BaseModel
+from .model import BaseModel
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -7,7 +7,7 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import os
 
-def load_data():
+def load_mnist():
     mnist_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
     mnist_dataset = datasets.MNIST(root='data', train=True, transform=mnist_transform, download=True)
     return mnist_dataset
@@ -41,14 +41,7 @@ class DigitClassifier(BaseModel):
     def __init__(self, epochs: int, batch_size: int, num_samples: int, 
                  node_hash: int, evaluating=False, device=None):
         super().__init__(num_samples, node_hash, epochs, batch_size, evaluating=evaluating)
-
-        # get number of gpus
-        cuda_devices = torch.cuda.device_count()
-        self.device = 'cuda:' + str(self.node_hash % cuda_devices) if cuda_devices > 0 else 'cpu'
- 
         self.model = Net().to(self.device)
-    def load_model(self, path):
-        self.model.load_state_dict(torch.load(path, weights_only=True))
 
     def train(self, subset_dataset):
         X_train = DataLoader(subset_dataset, batch_size=self.batch_size, shuffle=True)
@@ -94,10 +87,6 @@ class DigitClassifier(BaseModel):
         
         return accuracy, loss
 
-    def save_model(self, path):
-        if not os.path.exists(os.path.dirname(path)):
-            os.makedirs(os.path.dirname(path))
-        torch.save(self.model.state_dict(), path)
 
 if __name__ == '__main__':
     class DummyLogger:

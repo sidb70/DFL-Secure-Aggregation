@@ -11,8 +11,8 @@ import eval
 import torch
 from torch.utils.data import Subset
 import signal
-from training.models.torch.digit_classifier import DigitClassifier, BaseModel
-from training.models.torch.digit_classifier import load_data as MNIST_load_data
+from training.models.model_loader import load_model
+from training.dataloader import load_data
 from aggregation import strategies
 import time
 from attack import attacks
@@ -28,11 +28,13 @@ with open(experiment_yaml) as f:
 
 class DFLTrainer:
     def __init__(self, num_nodes, topology, num_workers, num_rounds, epochs_per_round, batch_size,
-                 num_samples, aggregation_method, attack_method, exp_id=experiment_params['id'], exp_iteration=experiment_params['iteration']):
+                 num_samples, aggregation_method, attack_method, exp_id=experiment_params['id'], exp_iteration=experiment_params['iteration'],
+                 dataset=experiment_params['dataset']):
         self.num_nodes = num_nodes
         self.topology = topology
         self.num_workers = num_workers
         self.num_rounds = num_rounds
+        self.dataset = dataset
         self.epochs_per_round = epochs_per_round
         self.batch_size = batch_size
         self.num_samples = num_samples
@@ -47,7 +49,7 @@ class DFLTrainer:
         self.exp_iteration = exp_iteration
         
         
-        self.mnist_dataset = None
+        self.dataset_name = dataset
         self.models_base_dir = os.path.join('src','training','models', 
                                             f'experiment_{self.exp_id}', f'{self.exp_iteration}','nodes')
         self.current_round=0
@@ -58,7 +60,7 @@ class DFLTrainer:
     def load_data(self):
         """ Load the data for the simulation. """
         print('Loading data')
-        self.mnist_dataset = MNIST_load_data()
+        self.dataset = load_data(self.dataset)
         
     def run(self):
         """
@@ -90,6 +92,7 @@ class DFLTrainer:
 
             self.current_round+=1
     def run_tasks(self, processes):
+        self.processes = processes
         for p in processes:
             p.start()
         for p in processes:
@@ -97,6 +100,7 @@ class DFLTrainer:
         # kill all processes just in case
         for p in processes:
             p.terminate()
+        self.processes = []
 
     def train_network(self):
         """
@@ -122,7 +126,7 @@ class DFLTrainer:
         """
         print(f'Training model for node {node_hash} round {self.current_round}')
         # create model
-        model = DigitClassifier(epochs=self.epochs_per_round, batch_size=self.batch_size, num_samples=self.num_samples, 
+        model = load_model(self.dataset_name)(epochs=self.epochs_per_round, batch_size=self.batch_size, num_samples=self.num_samples, 
                          node_hash=node_hash,
                          evaluating=False)
         if self.current_round>0:
@@ -130,10 +134,14 @@ class DFLTrainer:
             #print(os.listdir(os.path.join(self.models_base_dir, f'round_{self.current_round}')))
             model.load_model(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'))
     
-        start_index = (node_hash*self.num_samples)% len(self.mnist_dataset)
+        start_index = (node_hash*self.num_samples)% len(self.dataset)
         end_index = start_index + self.num_samples
         # print(f'Node {node_hash} training on samples {start_index} to {end_index}')
-        subset_dataset = Subset(self.mnist_dataset, list(range(start_index, end_index)))
+        if end_index < len(self.dataset):
+            subset_dataset = Subset(self.dataset, list(range(start_index, end_index)))
+        else:
+            subset_dataset = Subset(self.dataset, list(range(start_index, len(self.dataset))))
+            subset_dataset += Subset(self.dataset, list(range(0, end_index%len(self.dataset))))
         model.train(subset_dataset)
     
         # save model in current round dir
@@ -199,7 +207,8 @@ class DFLTrainer:
         if (not is_malicous and len(model_paths)>1) or (is_malicous and len(model_paths)>0):
             agg_args = {'f': len(model_paths), 
                         'm': len([neighbor for neighbor in neighbors if self.topology[neighbor]['malicious']]),
-                        'trimmed_mean_beta': experiment_params['trimmed_mean_beta'],}
+                        'trimmed_mean_beta': experiment_params['trimmed_mean_beta'],
+                        'device': f'cuda:{node_hash%torch.cuda.device_count()}'}
             aggregator = strategies.create_aggregator(node_hash, agg_args)
             aggregated_model = aggregator.aggregate(model_paths)
             print("Node ", node_hash, "aggregation complete")
@@ -207,7 +216,7 @@ class DFLTrainer:
             # use current model
             aggregated_model = torch.load(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'), weights_only=True)
         # load model
-        model = DigitClassifier(epochs=self.epochs_per_round, batch_size=self.batch_size, num_samples=self.num_samples,
+        model = load_model(self.dataset_name)(epochs=self.epochs_per_round, batch_size=self.batch_size, num_samples=self.num_samples,
                             node_hash=node_hash, evaluating=True)
         model.model.load_state_dict(aggregated_model)
 
@@ -234,12 +243,12 @@ class DFLTrainer:
             model.model.load_state_dict(poisoned_model)
             model.save_model(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'))
         else:
-                    # evaluate model on whole dataset
+            # evaluate model on whole dataset
             start_index = 0
-            end_index = len(self.mnist_dataset)
-            subset_dataset = Subset(self.mnist_dataset, list(range(start_index, end_index)))
+            end_index = len(self.dataset)
+            subset_dataset = Subset(self.dataset, list(range(start_index, end_index)))
             accuracy, loss = model.evaluate(subset_dataset)
-            metrics_dict[self.current_round]['accuracy'] += accuracy
+            metrics_dict[self.current_round]['accuracy'] += accuracy 
             metrics_dict[self.current_round]['loss'] += loss
             print(f'Node {node_hash} round {self.current_round} accuracy: {accuracy} loss: {loss}')
             # save to node metrics json
@@ -289,6 +298,8 @@ def delete_files(exp_id, iteration):
     Delete files in the models and core* files
     """
     models_dir = os.path.join('src','training','models', f'experiment_{exp_id}', f'{iteration}','nodes')
+    if not os.path.exists(models_dir):
+        return
     for round_dir in os.listdir(models_dir):
         for file in os.listdir(os.path.join(models_dir, round_dir)):
             os.remove(os.path.join(models_dir, round_dir, file))
@@ -303,12 +314,8 @@ def delete_files(exp_id, iteration):
     for file in os.listdir('.'):
         if file.startswith('core'):
             os.remove(file)
-def signal_handler(sig, frame):
-    print('Exiting simulation')
-    delete_files(experiment_params['id'], experiment_params['iteration'])
-    torch.cuda.empty_cache()
-    exit(0)
 
+trainer = None
 def run_simulation(params):
     """
     Runs the simulation with the experiment arguments.
@@ -323,7 +330,7 @@ def run_simulation(params):
     Returns:
         None
     """
-    global topology
+    global topology, trainer
     ### get args
     num_nodes = params['nodes']
     malicious_proportion = params['malicious_proportion']
@@ -359,22 +366,29 @@ def run_simulation(params):
     # wait_for_nodes(processes)
 
     # interrupt signal
-    signal.signal(signal.SIGINT, signal_handler)
+    # signal.signal(signal.SIGINT, signal_handler)
 
 
     dfl_trainer = DFLTrainer(num_nodes=num_nodes, topology=topology, num_workers=params['num_workers'], num_rounds=params['rounds'],
                              epochs_per_round=params['epochs_per_round'], batch_size=params['batch_size'], num_samples=params['num_samples'],
-                             aggregation_method=params['aggregation'], attack_method=params['attack_type'])
+                             aggregation_method=params['aggregation'], attack_method=params['attack_type'], dataset=params['dataset'])
 
 
-
+    trainer = dfl_trainer
     dfl_trainer.load_data()
     dfl_trainer.run()
 
     eval.save_results(experiment_params)
     eval.make_plot(exp_id)
 
-
+def signal_handler(sig, frame):
+    global trainer
+    if trainer is not None:
+        for p in trainer.processes:
+            p.kill()
+    torch.cuda.empty_cache()
+    delete_files(experiment_params['id'], experiment_params['iteration'])
+    exit(0)
 
 if __name__=='__main__':
     experiment_yaml = os.path.join('src','config', 'experiment.yaml')
@@ -383,4 +397,7 @@ if __name__=='__main__':
     print("Starting simulation with the following parameters:\n")
     print(experiment_params)
     print()
+
+    delete_files(experiment_params['id'], experiment_params['iteration'])
     run_simulation(experiment_params)
+    # delete_files(experiment_params['id'], experiment_params['iteration'])

@@ -2,7 +2,6 @@ import os
 import yaml
 import json
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 
 def save_results(experiment_params):
     exp_id = experiment_params['id']
@@ -40,15 +39,12 @@ def save_results(experiment_params):
         node_accuracies = node_metrics['accuracies']
         node_losses = node_metrics['losses']
         for r in range(30):
-            print(len(node_accuracies),r)
-            if len(node_accuracies) <= r:
-                print(node_hash_json)
+            # print(len(node_accuracies),r)
+            # if len(node_accuracies) <= r:
+            #     print(node_hash_json)
             avg_accuracies_by_round[r] += node_accuracies[r]
             avg_losses_by_round[r] += node_losses[r]
         num_benign_nodes += 1
-
-        
-        
     results['experiments'][-1]['accuracies_by_round'] = [a/num_benign_nodes for a in avg_accuracies_by_round]
     results['experiments'][-1]['loss_by_round'] = [l/num_benign_nodes for l in avg_losses_by_round]
     with open(os.path.join(save_dir,f'{exp_id}.json'),'w') as f:
@@ -130,12 +126,9 @@ def make_plot(exp_id):
     # plt.title('Strategic Byzantine Node Placement n=128\n Krum Loss by Round')
     # plt.savefig(os.path.join('src','training','results',f'experiment_{exp_id}_loss_by_round.png'))
     # plt.clf()
-
-
 # def eval_global_model(dataset):
 #     """
 #     Evaluate the global model.
-
 #     If id.json exists: create
 #     Open id.json
 #     {
@@ -150,14 +143,12 @@ def make_plot(exp_id):
 #                 .
 #             ]
 #     }
-
 #     """
 #     experiment_yaml = os.path.join('src','config', 'experiment.yaml')
 #     with open(experiment_yaml) as f:
 #         experiment_params = yaml.safe_load(f)
 #     experiment_id = experiment_params['id']
 #     experiment_desc = experiment_params['description']
-
 #     save_dir = os.path.join('src','training','results')
 #     if not os.path.exists(save_dir):
 #         os.makedirs(save_dir)
@@ -172,14 +163,12 @@ def make_plot(exp_id):
 #         results['id'] = experiment_id
 #         results['description'] = experiment_desc
 #         results['experiments'] = []
-
 #     topology_json_file = os.path.join('src', 'config', 'topology.json')
 #     with open(topology_json_file) as f:
 #         topology_json = json.load(f)
 #     topology = {int(node_id):val for node_id,val in topology_json.items()}
 #     num_nodes = experiment_params['nodes']
-
-    
+   
 #     if experiment_params['model_name'] == 'loan_defaulter':
 #         eval_model = LoanDefaulter(experiment_params['data_path'], \
 #                         num_samples=-1, node_hash=0, epochs=1, batch_size=10, evaluating=True, 
@@ -188,8 +177,7 @@ def make_plot(exp_id):
 #         eval_model = DigitClassifier(epochs=20, batch_size=experiment_params['batch_size'], 
 #                                  num_samples=500, 
 #                                  node_hash=42,
-#                                  evaluating=True)
-    
+#                                  evaluating=True) 
 #     models_pt_dir=os.path.join('src','training','models','nodes')
 #     print("Evaluating global model")
 #     accuracies_by_round = []
@@ -230,18 +218,14 @@ def make_plot(exp_id):
     # plt.ylabel('Accuracy')
     # plt.title('Accuracy by Round')
     # plt.show()
-
     # plt.savefig(os.path.join('src','training','results','accuracy_by_round.png'))
-    
-
     #plt.show()
 if __name__=='__main__':
     # save_results(3, 0)
     # save_results(3,1)
     # save_results(3,2)
     #
-    make_plot(12)
-
+    make_plot(13)
     # json_path = '/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/training/results/experiment_3/2/node_metrics'
     # # average all accuracies and losses for each round
     # avg_accuracies_by_round = [0]*30
@@ -253,7 +237,6 @@ if __name__=='__main__':
     #     node_accuracies = node_metrics['accuracies']
     #     node_losses = node_metrics['losses']
     #     for r in range(30):
-            
     #             #node_accuracies[-30:][r] = sum(node_accuracies[-30:][r])/len(node_accuracies[-30:][r])
     #         if len(node_accuracies) <= r:
     #             acc = node_accuracies[-1]
@@ -266,7 +249,6 @@ if __name__=='__main__':
     #         avg_accuracies_by_round[r] += acc
     #         avg_losses_by_round[r] +=loss
     #     num_benign_nodes += 1
-
     # avg_accuracies_by_round = [a/num_benign_nodes for a in avg_accuracies_by_round]
     # avg_losses_by_round = [l/num_benign_nodes for l in avg_losses_by_round]
     # # save to experiment json

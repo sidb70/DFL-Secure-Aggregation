@@ -5,7 +5,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn import model_selection
 import torch
 import matplotlib.pyplot as plt
-from .Model import BaseModel
+from .model import BaseModel
 from logging import Logger
 import copy
 
