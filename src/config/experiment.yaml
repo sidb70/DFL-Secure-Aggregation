@@ -1,6 +1,6 @@
 id: 13
-iteration: 1
-description: "trimmed mean"
+iteration: 2
+description: "small world 0.3 small-world random"
 use_saved_topology: true # if true, the topology will be loaded from the saved file
 topology_file: '/mnt/home/bhatta70/Documents/DFL-Secure-Aggregation/src/config/topologies/random_placement/small_world_0.3.json'
 # fl settings
@@ -15,7 +15,7 @@ topology: 'small-world'
 
 ## for small world topology
 small_world_k: 10 # number of neighbors to connect to for small world topology
-small_world_beta: 0.1 # probability of rewiring for small world topology
+small_world_beta: 0.2 # probability of rewiring for small world topology
 
 scale_free_m: 10 # degree of each new node for scale free topology
 
@@ -28,8 +28,8 @@ attack_type: "noise"
 attack_args: {'strength': 10}
 
 # aggregator settings
-aggregation: "trimmedmean"
-trimmed_mean_beta: .1 # for trimmed mean, beta is the proportion of weights to be trimmed from each side of the sorted array
+aggregation: "trimmedmean" # aggregation method
+trimmed_mean_beta: .2 # for trimmed mean, beta is the proportion of weights to be trimmed from each side of the sorted array
 
 # model settings
 model_name: "digit_classifier"
