@@ -1,12 +1,13 @@
 import torch
 import os
 class BaseModel:
-    def __init__(self, num_samples: int, node_hash: int, epochs: int, batch_size: int, evaluating=False):
+    def __init__(self, num_samples: int, node_hash: int, epochs: int, batch_size: int, evaluating=False, device=None):
         self.num_samples = num_samples
         self.node_hash = node_hash
         self.epochs = epochs
         self.batch_size = batch_size
         self.evaluating = evaluating
+        self.device = device if device else torch.device('cpu')
         self.data = None
         self.X_train = None
         self.X_valid = None

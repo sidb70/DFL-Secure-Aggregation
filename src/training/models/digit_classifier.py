@@ -40,8 +40,9 @@ class Net(nn.Module):
 class DigitClassifier(BaseModel):
     def __init__(self, epochs: int, batch_size: int, num_samples: int, 
                  node_hash: int, evaluating=False, device=None):
-        super().__init__(num_samples, node_hash, epochs, batch_size, evaluating=evaluating)
+        super().__init__(num_samples, node_hash, epochs, batch_size, evaluating=evaluating, device=device)
         self.model = Net().to(self.device)
+        print("Sent {} node's model to device: {}".format(self.node_hash, self.device))
 
     def train(self, subset_dataset):
         X_train = DataLoader(subset_dataset, batch_size=self.batch_size, shuffle=True)
