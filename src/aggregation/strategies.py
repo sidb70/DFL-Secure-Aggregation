@@ -6,7 +6,7 @@ import os
 experiment_yaml = os.path.join('src','config', 'experiment.yaml')
 with open(experiment_yaml) as f:
     experiment_params = yaml.safe_load(f)
-device =None
+device = None
 
 def create_aggregator(node_hash, agg_args: dict = {}):
     """
@@ -22,17 +22,17 @@ def create_aggregator(node_hash, agg_args: dict = {}):
     global experiment_params
     aggregator_type = experiment_params['aggregation']
     num_gpus = torch.cuda.device_count()
-    device = 'cuda:' + str(node_hash % num_gpus) if num_gpus > 0 else 'cpu'
+    device = torch.device('cuda:' + str(node_hash % num_gpus) if num_gpus > 0 else 'cpu')
     if aggregator_type == 'fedavg':
-        return FedAvg()
+        return FedAvg(device=device)
     elif aggregator_type == 'median':
-        return Median()
+        return Median(device=device)
     elif aggregator_type == 'krum':
-        return Krum()
+        return Krum(device=device)
     elif aggregator_type == 'trimmedmean':
         return TrimmedMean(trimmed_mean_beta=agg_args.get("trimmed_mean_beta", 0.2))
     elif aggregator_type == 'geomed':
-        return GeoMed()
+        return GeoMed(device=device)
     elif aggregator_type == 'multikrum':
         return MultiKrum(f=agg_args.get("f", None), m=agg_args.get("m", None))
     else:
@@ -190,7 +190,7 @@ class Median(Aggregator):
 
                 # flatten the tensor of each model put all on the same device
                 #models_layer_weight_flatten = torch.stack([models_params[j][layer].to(device).view(number_layer_weights) for j in range(0, total_models)], 0)
-                models_layer_weight_flatten = torch.stack([torch.load(model_paths[j], weights_only=True)[layer].to(device).view(number_layer_weights) for j in range(0, total_models)], 0)
+                models_layer_weight_flatten = torch.stack([torch.load(model_paths[j], weights_only=True,map_location=self.device)[layer].to(device).view(number_layer_weights) for j in range(0, total_models)], 0)
                 # get the weight list [w1j,w2j,··· ,wmj], where wij is the jth parameter of the ith local model
                 median = self.get_median(models_layer_weight_flatten)
                 accum[layer] = median.view(l_shape)
@@ -225,6 +225,7 @@ class Krum(Aggregator):
 
 
         # Create a Zero Model
+        print("Loading to device", self.device)
         model = torch.load(model_paths[0], map_location=self.device,weights_only=True)
         accum = {layer: torch.zeros_like(param).to(device) for layer, param in model.items()}
 
@@ -335,10 +336,12 @@ class GeoMed:
 
 
 def torch_full_partition(tensor, start, end):
-     #print("Sorting", tensor.shape, "start", start, "end", end)
-    sorted_tensor, _ = torch.sort(tensor, dim=0)
-    # print("Done sorting")
-    return sorted_tensor[start:end]
+    # print("Sorting", tensor.shape, "start", start, "end", end)
+    tensor = torch.sort(tensor, axis=0).values
+    #print("Sorted tensor", tensor)
+    trimmed = torch.tensor(tensor[start:end])
+     #print("Trimmed tensor", trimmed)
+    return trimmed
 class TrimmedMean(Aggregator):
     """
     TrimmedMean [Dong Yin et al., 2021]
@@ -378,30 +381,8 @@ class TrimmedMean(Aggregator):
             nobs = weights.shape[0]
             start = int(num_trim / 2)
             end = nobs - int(num_trim / 2)
-            # # remove the largest and smallest β items
-            # arr_weights = np.asarray(weights.cpu())
-           
-            # atmp = np.partition(arr_weights, (start, end - 1), 0)
-
-            # # Use torch.kthvalue to find the start-th and end-th elements
-            # start_val = torch.kthvalue(weights, start + 1).values
-            # end_val = torch.kthvalue(weights, end).values
-            # # Create a mask for values between start_val and end_val
-            # mask = (weights >= start_val) & (weights <= end_val)
-            # # Use the mask to get the "partitioned" tensor
-            # atmp = weights[mask]
-
-            # sl = [slice(None)] * atmp.ndim
-            # sl[0] = slice(start, end)
-
-            # # # print(atmp[tuple(sl)])
-            # # arr_median = np.mean(atmp[tuple(sl)], axis=0)
-            # arr_median = torch.mean(atmp, 0)
-
-            # print("Starting trim")
             trimmed_weights = torch_full_partition(weights, start, end)
-            # print("Done with trim")
-            res = torch.mean(trimmed_weights, 0)
+            res = torch.mean(trimmed_weights, 0).to(self.device)
             # res = torch.tensor(arr_median)
 
 
@@ -431,7 +412,7 @@ class TrimmedMean(Aggregator):
 
         # Create a Zero Model
         # accum = (models[-1][0]).copy()
-        self.device = 'cuda:0'
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         model = torch.load(model_paths[0],weights_only=True, map_location=self.device)
         accum = {layer: torch.zeros_like(param).to(self.device) for layer, param in model.items()}
 
@@ -578,3 +559,10 @@ class MultiKrum:
             values = torch.stack([updates[i] for i in top_m_indices], dim=0).mean(dim=0)
             inputs[layer] = values
         return inputs
+
+if __name__=='__main__':
+    tmean = TrimmedMean(device='cuda:0')
+    weights = torch.tensor([[1,2,-98],[4,5,-20],[7,12,9],[10,11,12],[13,14,15],[16,99,18],[19,20,21],[22,23,24],[25,26,27],[28,29,30]],device='cuda:0', dtype=torch.float32)
+    print("Weights", weights)
+    tmeaned = tmean.get_trimmedmean(weights)
+    print("Aggregated weights", tmeaned)
