@@ -130,8 +130,6 @@ class DFLTrainer:
                          node_hash=node_hash,
                          evaluating=False)
         if self.current_round>0:
-            # load model in current round dir (aggregated from previous round)
-            #print(os.listdir(os.path.join(self.models_base_dir, f'round_{self.current_round}')))
             model.load_model(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'))
     
         start_index = (node_hash*self.num_samples)% len(self.dataset)
@@ -194,7 +192,6 @@ class DFLTrainer:
         Returns:
             None
         """
-        
         neighbors = self.topology.get_neighbors(node_hash)
         is_malicous = self.topology[node_hash]['malicious']
         if not is_malicous:
@@ -207,9 +204,9 @@ class DFLTrainer:
         if (not is_malicous and len(model_paths)>1) or (is_malicous and len(model_paths)>0):
             agg_args = {'f': len(model_paths), 
                         'm': len([neighbor for neighbor in neighbors if self.topology[neighbor]['malicious']]),
-                        'trimmed_mean_beta': experiment_params['trimmed_mean_beta'],
-                        'device': f'cuda:{node_hash%torch.cuda.device_count()}'}
+                        'trimmed_mean_beta': experiment_params['trimmed_mean_beta']}
             aggregator = strategies.create_aggregator(node_hash, agg_args)
+            print("Node ", node_hash, "aggregating")
             aggregated_model = aggregator.aggregate(model_paths)
             print("Node ", node_hash, "aggregation complete")
         else:
@@ -217,7 +214,8 @@ class DFLTrainer:
             aggregated_model = torch.load(os.path.join(self.models_base_dir, f'round_{self.current_round}', f'node_{node_hash}.pt'), weights_only=True)
         # load model
         model = load_model(self.dataset_name)(epochs=self.epochs_per_round, batch_size=self.batch_size, num_samples=self.num_samples,
-                            node_hash=node_hash, evaluating=True)
+                            node_hash=node_hash, evaluating=True,
+                            device = torch.device('cuda:{}'.format(node_hash%torch.cuda.device_count())))
         model.model.load_state_dict(aggregated_model)
 
         # save model for next round
@@ -225,6 +223,7 @@ class DFLTrainer:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         model.save_model(os.path.join(save_dir, f'node_{node_hash}.pt'))
+        print("Saved model for node ", node_hash, "to", os.path.join(save_dir, f'node_{node_hash}.pt'))
         # if malicious, dont evaluate. Instead, attack the model
         if self.topology[node_hash]['malicious']:
             #attacker
@@ -236,8 +235,10 @@ class DFLTrainer:
             attack_args['malicious_nodes'] = len([neighbor for neighbor in neighbors if self.topology[neighbor]['malicious']])
             attacker = attacks.create_attacker(attack_type, attack_args, node_hash)
             if attack_type=='alie':
+                print("starting attack alie")
                 poisoned_model = attacker.attack(model_paths)
             else:
+                print("starting attack")
                 poisoned_model = attacker.attack(model.model.state_dict())
             #save the model in current round dir
             model.model.load_state_dict(poisoned_model)
@@ -259,41 +260,7 @@ class DFLTrainer:
         torch.cuda.empty_cache()
         delete_files(self.exp_id, self.exp_iteration)
 
-# ______________ Simulator ______________
-# def run_nodes(num_nodes):
-#     """
-#     Run the specified number of nodes.
-
-#     Args:
-#         num_nodes (int): The number of nodes to run.
-
-#     Returns:
-#         None
-#     """
-#     processes = []
-#     for i in range(num_nodes):
-#         # run as separate process to avoid GIL
-#         node_file = os.path.join(os.getcwd(),'src','node.py')
-#         process = subprocess.Popen(['python', node_file, '--id', str(i)])
-#         processes.append(process)
-#         print(f'Started node {i}')
-#     return processes
-# def wait_for_nodes(processes: list):
-#     # kill nodes if server is killed
-#     def kill_nodes(signum, frame):
-#         for process in processes:
-#             process.kill()
-#         print('Killed all nodes')
-#         torch.cuda.empty_cache()
-#         # clear model directory
-#         delete_files()
-#         exit(0)
-    # signal.signal(signal.SIGINT, kill_nodes)
-    
-    # for process in processes:
-    #     process.wait()
-    # print('All nodes finished')
-def delete_files(exp_id, iteration):
+def delete_files(exp_id, iteration, node_metrics=False):
     """
     Delete files in the models and core* files
     """
@@ -305,12 +272,13 @@ def delete_files(exp_id, iteration):
             os.remove(os.path.join(models_dir, round_dir, file))
 
     # remove json
-    # node_metrics_dir = os.path.join('src','training','results',f'experiment_{exp_id}',f'{iteration}','node_metrics')
-    # for file in os.listdir(node_metrics_dir):
-    #     os.remove(os.path.join(node_metrics_dir, file))
+    if node_metrics:
+        node_metrics_dir = os.path.join('src','training','results',f'experiment_{exp_id}',f'{iteration}','node_metrics')
+        if os.path.exists(node_metrics_dir):
+            for file in os.listdir(node_metrics_dir):
+                os.remove(os.path.join(node_metrics_dir, file))
 
     # remove core files
-    
     for file in os.listdir('.'):
         if file.startswith('core'):
             os.remove(file)
@@ -352,6 +320,8 @@ def run_simulation(params):
         elif experiment_params['topology']=='scale-free':
             m = params['scale_free_m']
             topology.create_scale_free_graph(num_nodes, m,malicous_nodes)
+        elif experiment_params['topology'] == 'two-f-1':
+            topology.create_2f1_disjoint_graph(num_nodes, malicous_nodes)
         else:
             raise ValueError('Invalid topology: must be random, small-world, or scale-free')
 
@@ -361,13 +331,6 @@ def run_simulation(params):
     else:
         topology.load(topology_file)
         print('Using saved topology')
-
-    # processes = run_nodes(num_nodes)
-    # wait_for_nodes(processes)
-
-    # interrupt signal
-    # signal.signal(signal.SIGINT, signal_handler)
-
 
     dfl_trainer = DFLTrainer(num_nodes=num_nodes, topology=topology, num_workers=params['num_workers'], num_rounds=params['rounds'],
                              epochs_per_round=params['epochs_per_round'], batch_size=params['batch_size'], num_samples=params['num_samples'],
@@ -398,6 +361,5 @@ if __name__=='__main__':
     print(experiment_params)
     print()
 
-    delete_files(experiment_params['id'], experiment_params['iteration'])
+    delete_files(experiment_params['id'], experiment_params['iteration'], node_metrics=True)
     run_simulation(experiment_params)
-    # delete_files(experiment_params['id'], experiment_params['iteration'])

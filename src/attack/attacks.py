@@ -67,7 +67,7 @@ class ALittleIsEnough:
         '''
         print(f"[ALIE] Initialized with args {attack_args}")
         num_nodes = attack_args['nodes']
-        num_byz = attack_args['byzantine']
+        num_byz = attack_args['malicious_nodes']
 
         #s = torch.floor_divide(num_nodes, 2) + 1 - num_byz 
         # torch.floor_divide is deprecated. use torch.div 

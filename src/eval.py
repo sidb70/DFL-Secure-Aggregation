@@ -84,8 +84,8 @@ def make_plot(exp_id):
         results = json.load(f)
 
     print(len(results['experiments']))
-    line_type = { 'scale-free': '-', 'small-world': '--'}
-    line_color = {0.0: 'green', 0.3: 'blue', 0.6: 'red'}
+    line_type = { 'scale-free': '-', 'small-world': '--', 'two-f-1': '-.'}
+    line_color = {0.0: 'green', 0.3: 'blue', 0.6: 'red', .15: 'pink', .45: 'orange'}
     for i in range(len(results['experiments'])):
         accuracies_by_round = results['experiments'][i]['accuracies_by_round']
         experiment_params = results['experiments'][i]['params']
